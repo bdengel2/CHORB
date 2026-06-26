@@ -184,31 +184,19 @@ const americanToImplied = odds => odds < 0 ? Math.abs(odds) / (Math.abs(odds) + 
 
 // Normalize a dict of {team: americanOdds} per-group so each group sums to 32/12
 // Returns {team: probability (0-1)} or null if data is too sparse to trust
-const normalizeOddsDict = rawDict => {
-  const TARGET = 32 / 12;
+// Convert { teamName: American moneyline } to team-specific implied probabilities.
+// Each team's probability is independent — no group-level normalization applied.
+// This avoids the flawed "sum to 2.667 per group" approach.
+const normalizeOddsDict = rawOdds => {
   const result = {};
-  let coveredGroups = 0;
-  Object.entries(GROUPS).forEach(([g, teams]) => {
-    const known = teams.filter(t => rawDict[t] !== undefined);
-    if (known.length < 2) return; // not enough data for this group
-    coveredGroups++;
-    const raws = teams.map(t => {
-      var _rawDict$t;
-      return {
-        t,
-        p: americanToImplied((_rawDict$t = rawDict[t]) !== null && _rawDict$t !== void 0 ? _rawDict$t : t in rawDict ? rawDict[t] : 0)
-      };
-    });
-    const total = raws.reduce((s, r) => s + r.p, 0);
-    if (total === 0) return;
-    raws.forEach(({
-      t,
-      p
-    }) => {
-      result[t] = Math.min(0.9999, Math.max(0.0001, p * TARGET / total));
-    });
+  Object.entries(rawOdds).forEach(([teamRaw, ml]) => {
+    const team = normalizeTeam(teamRaw) || teamRaw;
+    if (!ALL_TEAMS.includes(team)) return;
+    const m = Number(ml);
+    if (isNaN(m)) return;
+    result[team] = m > 0 ? 100 / (m + 100) : Math.abs(m) / (Math.abs(m) + 100);
   });
-  return coveredGroups >= 6 ? result : null; // require at least half the groups to trust
+  return Object.keys(result).length >= 10 ? result : null;
 };
 
 // ═══════════════════ FLAGS — self-contained inline SVG (no network dependency, renders everywhere incl. Windows) ═══════════════════
@@ -1985,6 +1973,61 @@ const updateLiveStatus = dict => {
     }
     _liveStatus[normalized] = val;
   });
+};
+
+// ── Seed WC win odds (Polymarket approximate, ~June 26, 2026) ────────────────
+// These are team-specific independent probabilities of WINNING the World Cup,
+// used as a fallback when the live Polymarket WC winner fetch hasn't succeeded.
+// Source: Polymarket "2026 FIFA World Cup Winner" market, aggregated.
+const SEED_WC_ODDS = {
+  'France': 0.19,
+  'Spain': 0.14,
+  'England': 0.13,
+  'Argentina': 0.12,
+  'Brazil': 0.09,
+  'Portugal': 0.08,
+  'Germany': 0.06,
+  'Netherlands': 0.05,
+  'USA': 0.04,
+  'Colombia': 0.03,
+  'Morocco': 0.03,
+  'Norway': 0.03,
+  'Mexico': 0.02,
+  'Belgium': 0.02,
+  'Uruguay': 0.02,
+  'Japan': 0.02,
+  'Australia': 0.01,
+  'Ivory Coast': 0.01,
+  'Croatia': 0.01,
+  'Ecuador': 0.005,
+  'Switzerland': 0.005,
+  'Bosnia and Herzegovina': 0.005,
+  'Sweden': 0.005,
+  'Senegal': 0.004,
+  'Egypt': 0.004,
+  'Paraguay': 0.004,
+  'Canada': 0.003,
+  'South Korea': 0.003,
+  'Austria': 0.003,
+  'Algeria': 0.003,
+  'Iran': 0.003,
+  'South Africa': 0.002,
+  'Scotland': 0.002,
+  'Saudi Arabia': 0.002,
+  'DR Congo': 0.002,
+  'Ghana': 0.002,
+  'Cape Verde': 0.001,
+  'Uzbekistan': 0.001,
+  'New Zealand': 0.001,
+  'Iraq': 0.001,
+  'Haiti': 0.001,
+  'Jordan': 0,
+  'Panama': 0,
+  'Qatar': 0,
+  'Tunisia': 0,
+  'Turkey': 0,
+  'Czechia': 0,
+  'Curaçao': 0
 };
 
 // ── Known group-stage outcomes (hardcoded fallback) ───────────────────────────
@@ -3781,7 +3824,7 @@ const BRACKET_W = 5 * COL_W;
 // advancement odds for knockout matches). Falls back to SEED_ODDS if WC odds not loaded.
 // Returns [p1pct, p2pct] or null if either team is TBD/unknown.
 function matchWinProb(t1, t2) {
-  var _wcOdds$t, _wcOdds$t2;
+  var _wcOdds$t, _wcOdds$t2, _SEED_WC_ODDS$t, _SEED_WC_ODDS$t2;
   if (!t1 || !t2 || t1 === 'TBD' || t2 === 'TBD') return null;
   if (!ALL_TEAMS.includes(t1) || !ALL_TEAMS.includes(t2)) return null;
   // Use WC win probability if available — e.g. Brazil 15% vs Japan 2% → 88/12
@@ -3794,12 +3837,12 @@ function matchWinProb(t1, t2) {
     const p1 = Math.round(w1 / total * 100);
     return [Math.max(1, Math.min(99, p1)), Math.max(1, Math.min(99, 100 - p1))];
   }
-  // Fallback: SEED_ODDS (pre-tournament advancement odds — less accurate but better than nothing)
-  const s1 = SEED_ODDS[t1],
-    s2 = SEED_ODDS[t2];
-  if (!s1 || !s2) return null;
-  const total = s1 + s2;
-  return [Math.round(s1 / total * 100), Math.round(s2 / total * 100)];
+  // Fallback: SEED_WC_ODDS (approximate Polymarket WC win probs, team-specific)
+  const s1 = (_SEED_WC_ODDS$t = SEED_WC_ODDS[t1]) !== null && _SEED_WC_ODDS$t !== void 0 ? _SEED_WC_ODDS$t : 0.01,
+    s2 = (_SEED_WC_ODDS$t2 = SEED_WC_ODDS[t2]) !== null && _SEED_WC_ODDS$t2 !== void 0 ? _SEED_WC_ODDS$t2 : 0.01;
+  if (s1 + s2 === 0) return null;
+  const p = Math.round(s1 / (s1 + s2) * 100);
+  return [Math.max(1, Math.min(99, p)), Math.max(1, Math.min(99, 100 - p))];
 }
 function BracketCard({
   t1,
@@ -4030,11 +4073,11 @@ function KnockoutTab({
   const wcProb = PLAYERS.reduce((acc, p) => {
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     acc[p] = myTeams.reduce((sum, t) => {
-      var _wcOdds$t3, _SEED_ODDS$t;
+      var _wcOdds$t3, _SEED_WC_ODDS$t3;
       if (knockoutLosers.has(t)) return sum;
       if (getClinch(t, stats, standings, groupEvents) === 'ELIMINATED') return sum;
       // Use Polymarket WC win probability if available; fall back to normalized SEED_ODDS
-      const prob = hasWCOdds ? (_wcOdds$t3 = _wcOdds[t]) !== null && _wcOdds$t3 !== void 0 ? _wcOdds$t3 : 0 : liveOdds && liveOdds[t] != null ? liveOdds[t] : (_SEED_ODDS$t = SEED_ODDS[t]) !== null && _SEED_ODDS$t !== void 0 ? _SEED_ODDS$t : 0;
+      const prob = hasWCOdds ? (_wcOdds$t3 = _wcOdds[t]) !== null && _wcOdds$t3 !== void 0 ? _wcOdds$t3 : 0 : (_SEED_WC_ODDS$t3 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t3 !== void 0 ? _SEED_WC_ODDS$t3 : 0; // SEED_WC_ODDS is a better fallback than R32 odds
       return sum + prob;
     }, 0);
     return acc;
@@ -4056,10 +4099,10 @@ function KnockoutTab({
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     const activeTeamsForP = myTeams.filter(t => !knockoutLosers.has(t) && getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED');
     const topTeam = activeTeamsForP.length ? activeTeamsForP.reduce((best, t) => {
-      var _wcOdds$t4, _ref3, _ref4, _wcOdds$best, _ref5, _ref6;
+      var _wcOdds$t4, _SEED_WC_ODDS$t4, _wcOdds$best, _SEED_WC_ODDS$best;
       // Use WC win odds for "most likely champion" (not R32 odds)
-      const prob = hasWCOdds ? (_wcOdds$t4 = _wcOdds[t]) !== null && _wcOdds$t4 !== void 0 ? _wcOdds$t4 : 0 : (_ref3 = (_ref4 = liveOdds && liveOdds[t]) !== null && _ref4 !== void 0 ? _ref4 : SEED_ODDS[t]) !== null && _ref3 !== void 0 ? _ref3 : 0;
-      const bestProb = hasWCOdds ? (_wcOdds$best = _wcOdds[best]) !== null && _wcOdds$best !== void 0 ? _wcOdds$best : 0 : (_ref5 = (_ref6 = liveOdds && liveOdds[best]) !== null && _ref6 !== void 0 ? _ref6 : SEED_ODDS[best]) !== null && _ref5 !== void 0 ? _ref5 : 0;
+      const prob = hasWCOdds ? (_wcOdds$t4 = _wcOdds[t]) !== null && _wcOdds$t4 !== void 0 ? _wcOdds$t4 : 0 : (_SEED_WC_ODDS$t4 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t4 !== void 0 ? _SEED_WC_ODDS$t4 : 0;
+      const bestProb = hasWCOdds ? (_wcOdds$best = _wcOdds[best]) !== null && _wcOdds$best !== void 0 ? _wcOdds$best : 0 : (_SEED_WC_ODDS$best = SEED_WC_ODDS[best]) !== null && _SEED_WC_ODDS$best !== void 0 ? _SEED_WC_ODDS$best : 0;
       return prob > bestProb ? t : best;
     }, activeTeamsForP[0]) : null;
     return /*#__PURE__*/React.createElement("div", {

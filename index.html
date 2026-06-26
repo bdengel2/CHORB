@@ -1127,9 +1127,10 @@ Find ALL of the following:
 
 3. Any confirmed knockout matches (R32/R16/QF/SF/Final) with teams, scores, date, status, and city.
 
-4. Current sportsbook American moneyline odds for all 48 teams to advance past the group stage (DraftKings/FanDuel/BetMGM). Eliminated teams: +100000. Clinched: -100000.
+4. Per-team probability (0.0–1.0 decimal) of reaching the Round of 32, sourced from Polymarket's 'World Cup: Team to advance to Knockout Stages' market (polymarket.com/event/world-cup-team-to-advance-to-knockout-stages) or Neil Paine's tracker (neilpaine.substack.com/p/2026-world-cup-odds-tracker). These are team-specific independent probabilities — do NOT normalize within groups. Eliminated teams: 0.0. Clinched: 1.0.
 
-5. Official advancement status — check fifa.com standings for the green (qualified) and red (eliminated) markers. For each team with a confirmed outcome include:
+5. Per-team probability (0.0–1.0) of WINNING the World Cup (not just advancing), from Polymarket's 'World Cup Winner' market or Neil Paine's 'Win WC' column. Return as a separate 'wcOdds' object: {"Brazil":0.15,"France":0.18,...}. Eliminated teams: 0.0.
+6. Official advancement status — check fifa.com standings for the green (qualified) and red (eliminated) markers. For each team with a confirmed outcome include:
    - FIRST = group winner
    - SECOND = group runner-up  
    - WILDCARD = qualified as one of the 8 best third-place teams
@@ -1137,7 +1138,7 @@ Find ALL of the following:
    Only include teams with CONFIRMED outcomes. Crucially: third-place teams are only WILDCARD if FIFA has officially confirmed they are in the top 8 third-place finishers — otherwise omit them (their group may still be in progress or the third-place ranking may not yet be finalised).
 
 Respond with ONLY compact single-line JSON in this exact shape:
-{"standings":[{"team":"<name>","group":"<A-L>","mp":<int>,"w":<int>,"d":<int>,"l":<int>,"gf":<int>,"ga":<int>,"pts":<int>}],"matches":[{"stage":"group","group":"<A-L>","date":"<ISO 8601>","team1":"<name>","team2":"<name>","score1":<int or null>,"score2":<int or null>,"status":"<FT|LIVE|SCHEDULED>"}],"odds":{"Mexico":-1400},"status":{"Mexico":"FIRST","Qatar":"ELIMINATED"}}
+{"standings":[{"team":"<name>","group":"<A-L>","mp":<int>,"w":<int>,"d":<int>,"l":<int>,"gf":<int>,"ga":<int>,"pts":<int>}],"matches":[{"stage":"group","group":"<A-L>","date":"<ISO 8601>","team1":"<name>","team2":"<name>","score1":<int or null>,"score2":<int or null>,"status":"<FT|LIVE|SCHEDULED>"}],"odds":{"Mexico":0.98,"Qatar":0.0},"wcOdds":{"Brazil":0.15,"France":0.18},"status":{"Mexico":"FIRST","Qatar":"ELIMINATED"}}
 
 No markdown, no code fences, no commentary. Never invent results.`;
 }
@@ -1295,9 +1296,37 @@ async function fetchFromAISearch() {
   const fullText = textBlocks.join('\n');
   if (!fullText.trim()) throw new Error('Empty response from search');
   const parsed = repairJSON(fullText);
-  // Normalize the raw odds dict (American moneyline → vig-removed implied probs per group)
+  // Parse odds: accept either decimal 0-1 probabilities (Polymarket format, preferred)
+  // or American moneyline (legacy fallback: normalize per group)
   const rawOdds = parsed.odds && typeof parsed.odds === 'object' ? parsed.odds : null;
-  const liveOdds = rawOdds ? normalizeOddsDict(rawOdds) : null;
+  let liveOdds = null;
+  if (rawOdds) {
+    const vals = Object.values(rawOdds).map(Number).filter(v => !isNaN(v));
+    const isDecimal = vals.length > 0 && vals.every(v => v >= 0 && v <= 1);
+    if (isDecimal) {
+      // Already team-specific probabilities — use directly, just normalize team names
+      liveOdds = {};
+      Object.entries(rawOdds).forEach(([k, v]) => {
+        const t = normalizeTeam(k) || k;
+        liveOdds[t] = Math.max(0, Math.min(1, Number(v)));
+      });
+      if (Object.keys(liveOdds).length < 10) liveOdds = null;
+    } else {
+      // Moneyline format — fall back to group-normalized conversion
+      liveOdds = normalizeOddsDict(rawOdds);
+    }
+  }
+  // WC win odds from AI search
+  const rawWcOdds = parsed.wcOdds && typeof parsed.wcOdds === 'object' ? parsed.wcOdds : null;
+  if (rawWcOdds) {
+    const wcVals = Object.values(rawWcOdds).map(Number).filter(v => !isNaN(v));
+    if (wcVals.length >= 10 && wcVals.every(v => v >= 0 && v <= 1)) {
+      Object.entries(rawWcOdds).forEach(([k, v]) => {
+        const t = normalizeTeam(k) || k;
+        _wcOdds[t] = Math.max(0, Math.min(1, Number(v)));
+      });
+    }
+  }
   // Status dict from AI search — maps team name → FIRST|SECOND|WILDCARD|ELIMINATED
   const liveStatus = parsed.status && typeof parsed.status === 'object' ? parsed.status : {};
   return {
@@ -1514,6 +1543,153 @@ function computeStandingsFromMatches(groupMatches) {
   });
   return Object.values(acc);
 }
+
+// ── Polymarket R32 odds (team-specific, not group-normalized) ─────────────
+// Fetches each team's individual probability of reaching the Round of 32 from
+// Polymarket's public Gamma API — the same data Neil Paine's odds tracker
+// aggregates and presents in his Datawrapper chart.
+// Each price is a raw 0-1 decimal; no normalization applied.
+async function fetchPolymarketR32Odds() {
+  var _event$markets;
+  // Primary: Polymarket's public Gamma API (CORS-enabled, no auth needed)
+  const url = 'https://gamma-api.polymarket.com/events?slug=world-cup-team-to-advance-to-knockout-stages&limit=1';
+  const resp = await fetch(url, {
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+  if (!resp.ok) throw new Error(`Gamma API ${resp.status}`);
+  const data = await resp.json();
+  const events = Array.isArray(data) ? data : data.data || [data];
+  const event = events.find(e => e.markets && e.markets.length > 0) || events[0];
+  if (!(event !== null && event !== void 0 && (_event$markets = event.markets) !== null && _event$markets !== void 0 && _event$markets.length)) throw new Error('No markets in Gamma response');
+  const odds = {};
+  (event.markets || []).forEach(m => {
+    var _ref, _m$lastTradePrice;
+    // groupItemTitle holds the team name, e.g. "Ecuador"
+    const teamRaw = m.groupItemTitle || m.title || m.question || '';
+    // outcomePrices is a JSON string like '["0.99","0.01"]'
+    // outcomes is a JSON string like '["Yes","No"]'
+    let yesPrice = null;
+    try {
+      const prices = JSON.parse(m.outcomePrices || '[]');
+      const outcomes = JSON.parse(m.outcomes || '["Yes","No"]');
+      const yesIdx = outcomes.findIndex(o => /yes/i.test(String(o)));
+      yesPrice = parseFloat(prices[yesIdx >= 0 ? yesIdx : 0]);
+    } catch {}
+    // Fallback: some API versions expose bestBid/bestAsk directly
+    if (isNaN(yesPrice) || yesPrice === null) yesPrice = parseFloat((_ref = (_m$lastTradePrice = m.lastTradePrice) !== null && _m$lastTradePrice !== void 0 ? _m$lastTradePrice : m.midpoint) !== null && _ref !== void 0 ? _ref : '');
+    const team = normalizeTeam(teamRaw.trim());
+    if (team && !isNaN(yesPrice)) odds[team] = Math.max(0, Math.min(1, yesPrice));
+  });
+  if (Object.keys(odds).length < 20) throw new Error(`Too few teams: ${Object.keys(odds).length}`);
+  return odds;
+}
+
+// Fallback: Neil Paine's Datawrapper chart (uUdMb) embeds these same Polymarket
+// odds as a CSV. Try multiple version numbers since the chart updates during the
+// tournament (versions increment each time Neil publishes a new chart revision).
+async function fetchNeilPaineOdds() {
+  const chartId = 'uUdMb';
+  // Try versions 4..20 in parallel; keep the highest-numbered one that succeeds
+  const versionResults = await Promise.allSettled(Array.from({
+    length: 17
+  }, (_, i) => i + 4).map(v => fetch(`https://datawrapper.dwcdn.net/${chartId}/${v}/dataset.csv`).then(r => r.ok ? r.text().then(txt => ({
+    v,
+    txt
+  })) : Promise.reject())));
+  const best = versionResults.filter(r => r.status === 'fulfilled').map(r => r.value).sort((a, b) => b.v - a.v)[0];
+  if (!best) throw new Error('All Datawrapper versions failed');
+  const lines = best.txt.trim().split('\n');
+  const headers = lines[0].split(',').map(h => h.replace(/"/g, '').trim().toLowerCase());
+  const teamIdx = headers.findIndex(h => /^team$|^name$|^country$/.test(h));
+  const r32Idx = headers.findIndex(h => /r32|round of 32|knockout|make r|advance/i.test(h));
+  if (teamIdx === -1 || r32Idx === -1) throw new Error(`Columns not found: ${headers.join(',')}`);
+  const r32Odds = {},
+    wcOdds = {};
+  // Also find "Win WC" / "Win World Cup" column for WC win probabilities
+  const wcIdx = headers.findIndex(h => /win.*(wc|world|cup|trophy)|champion/i.test(h));
+  lines.slice(1).forEach(line => {
+    const cols = line.split(',').map(c => c.replace(/"/g, '').trim());
+    const team = normalizeTeam(cols[teamIdx]);
+    if (!team) return;
+    const rawR32 = parseFloat(cols[r32Idx]);
+    if (!isNaN(rawR32)) r32Odds[team] = rawR32 > 1 ? rawR32 / 100 : rawR32;
+    if (wcIdx >= 0) {
+      const rawWC = parseFloat(cols[wcIdx]);
+      if (!isNaN(rawWC)) wcOdds[team] = rawWC > 1 ? rawWC / 100 : rawWC;
+    }
+  });
+  if (Object.keys(r32Odds).length < 20) throw new Error('Too few teams in CSV');
+  return {
+    r32Odds,
+    wcOdds: Object.keys(wcOdds).length >= 20 ? wcOdds : null
+  };
+}
+
+// Fetch WC winner probabilities from Polymarket.
+async function fetchPolymarketWCOdds() {
+  var _event$markets2;
+  const url = 'https://gamma-api.polymarket.com/events?slug=world-cup-winner&limit=1';
+  const resp = await fetch(url, {
+    headers: {
+      Accept: 'application/json'
+    }
+  });
+  if (!resp.ok) throw new Error(`WC winner API ${resp.status}`);
+  const data = await resp.json();
+  const events = Array.isArray(data) ? data : data.data || [data];
+  const event = events.find(e => e.markets && e.markets.length > 0) || events[0];
+  if (!(event !== null && event !== void 0 && (_event$markets2 = event.markets) !== null && _event$markets2 !== void 0 && _event$markets2.length)) throw new Error('No markets');
+  const odds = {};
+  (event.markets || []).forEach(m => {
+    var _ref2, _m$lastTradePrice2;
+    const teamRaw = m.groupItemTitle || m.title || m.question || '';
+    let yesPrice = null;
+    try {
+      const prices = JSON.parse(m.outcomePrices || '[]');
+      const outcomes = JSON.parse(m.outcomes || '["Yes","No"]');
+      const yesIdx = outcomes.findIndex(o => /yes/i.test(String(o)));
+      yesPrice = parseFloat(prices[yesIdx >= 0 ? yesIdx : 0]);
+    } catch {}
+    if (isNaN(yesPrice) || yesPrice === null) yesPrice = parseFloat((_ref2 = (_m$lastTradePrice2 = m.lastTradePrice) !== null && _m$lastTradePrice2 !== void 0 ? _m$lastTradePrice2 : m.midpoint) !== null && _ref2 !== void 0 ? _ref2 : '');
+    const team = normalizeTeam(teamRaw.trim());
+    if (team && !isNaN(yesPrice)) odds[team] = Math.max(0, Math.min(1, yesPrice));
+  });
+  if (Object.keys(odds).length < 20) throw new Error(`Too few teams: ${Object.keys(odds).length}`);
+  return odds;
+}
+
+// Try both Polymarket sources in parallel; update both R32 and WC odds.
+// Returns { r32Odds, wcOdds } where each is { teamName: probability(0-1) } or null.
+async function fetchLiveOdds() {
+  // Try Neil Paine's Datawrapper CSV first (has both R32 and WC columns in one CSV)
+  // then fall back to separate Polymarket API calls
+  let r32Odds = null,
+    wcOdds = null;
+  try {
+    var _np$r32Odds, _np$wcOdds;
+    const np = await fetchNeilPaineOdds();
+    r32Odds = (_np$r32Odds = np === null || np === void 0 ? void 0 : np.r32Odds) !== null && _np$r32Odds !== void 0 ? _np$r32Odds : null;
+    wcOdds = (_np$wcOdds = np === null || np === void 0 ? void 0 : np.wcOdds) !== null && _np$wcOdds !== void 0 ? _np$wcOdds : null;
+  } catch {}
+
+  // Fill any gaps with dedicated Polymarket API calls
+  if (!r32Odds) {
+    try {
+      r32Odds = await fetchPolymarketR32Odds();
+    } catch {}
+  }
+  if (!wcOdds) {
+    try {
+      wcOdds = await fetchPolymarketWCOdds();
+    } catch {}
+  }
+  return {
+    r32Odds,
+    wcOdds
+  };
+}
 async function fetchFromESPN() {
   // Fire all date-window scoreboard fetches + standings in parallel.
   // Each scoreboard window covers one chunk of the tournament schedule;
@@ -1545,10 +1721,20 @@ async function fetchFromESPN() {
   } else {
     standings = computeStandingsFromMatches(matches.filter(m => m.stage === 'group'));
   }
+
+  // Fetch Polymarket R32 + WC odds in parallel with ESPN data
+  const {
+    r32Odds: polyR32,
+    wcOdds: polyWC
+  } = await fetchLiveOdds().catch(() => ({
+    r32Odds: null,
+    wcOdds: null
+  }));
+  if (polyWC) Object.assign(_wcOdds, polyWC);
   return {
     standings,
     matches,
-    liveOdds: null,
+    liveOdds: polyR32,
     liveStatus: espnStatus
   };
 }
@@ -1782,6 +1968,7 @@ const canStillReachWildcard = (team, stats, standings) => {
 // This is checked before KNOWN_STATUS and the mathematical logic.
 // Updated by updateLiveStatus() which is called from the refresh function.
 let _liveStatus = {};
+let _wcOdds = {}; // team → P(win WC), from Polymarket 'World Cup Winner' market
 const updateLiveStatus = dict => {
   if (!dict || typeof dict !== 'object') return;
   Object.entries(dict).forEach(([team, val]) => {
@@ -1866,8 +2053,8 @@ const isEliminated = (team, stats, standings) => {
 //   1. KNOWN_STATUS override (confirmed official results) → 0.0 or 1.0
 //   2. Mathematically clinched → 1.0 exactly
 //   3. Mathematically eliminated → 0.0 exactly
-//   4. liveOdds (current sportsbook odds fetched this session, vig-normalized) → use directly
-//   5. SEED_ODDS (pre-tournament odds normalized per group, updated June 23 2026) → fallback
+//   4. liveOdds — Polymarket per-team R32 probability (team-specific, not group-normalized)
+//   5. SEED_ODDS — pre-tournament odds normalized per group (June 23 2026) → fallback
 // The returned value is always a clean 0–1 implied probability.
 const getAdvProb = (team, stats, standings, groupMatches, liveOdds) => {
   var _SEED_ODDS$team;
@@ -1963,6 +2150,9 @@ const ProbBar = ({
   prob
 }) => {
   const pct = Math.round(prob * 100);
+  // Show ">99%" rather than "100%" when not officially confirmed — avoids overstating certainty
+  const label = pct >= 100 ? '>99%' : `${pct}%`;
+  const displayPct = Math.min(pct, 99); // cap bar fill at 99% too
   const color = pct >= 80 ? T.green : pct >= 50 ? T.gold : pct >= 20 ? '#C2693A' : T.textFaint;
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -1970,7 +2160,7 @@ const ProbBar = ({
       alignItems: 'center',
       gap: 5
     },
-    title: "Estimated chance of finishing top 2 in group (or as a top-8 third-place team) and reaching the Round of 32"
+    title: "Polymarket odds of reaching the Round of 32 (team-specific, not group-normalized)"
   }, /*#__PURE__*/React.createElement("div", {
     style: {
       width: 44,
@@ -1981,7 +2171,7 @@ const ProbBar = ({
     }
   }, /*#__PURE__*/React.createElement("div", {
     style: {
-      width: `${pct}%`,
+      width: `${displayPct}%`,
       height: '100%',
       background: color,
       borderRadius: 3
@@ -1993,7 +2183,7 @@ const ProbBar = ({
       fontWeight: 700,
       minWidth: 30
     }
-  }, pct, "%"));
+  }, label));
 };
 const StatusBadge = ({
   ev
@@ -3257,7 +3447,7 @@ function ChartsTab({
 
   // ── Chart helpers ─────────────────────────────────────────────────
   const W = 680,
-    H = 200,
+    H = 320,
     M = {
       t: 28,
       r: 24,
@@ -3574,246 +3764,7 @@ function ChartsTab({
     fontSize: 9,
     fill: T.textFaint,
     textAnchor: "start"
-  }, "Pts")))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: T.card,
-      border: `1px solid ${T.border}`,
-      borderRadius: 4,
-      overflow: 'hidden'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '10px 14px',
-      borderBottom: `1px solid ${T.border}`,
-      display: 'flex',
-      alignItems: 'center',
-      gap: 12,
-      flexWrap: 'wrap'
-    }
-  }, /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontWeight: 700,
-      fontSize: 13,
-      color: T.textPrimary
-    }
-  }, "Clinched Teams Over Time"), /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      color: T.textTertiary
-    }
-  }, "flags in each owner's shaded lane mark clinch events; leader lines are neutral"), /*#__PURE__*/React.createElement("div", {
-    style: {
-      display: 'flex',
-      gap: 12,
-      marginLeft: 'auto',
-      flexWrap: 'wrap'
-    }
-  }, PLAYERS.map(p => /*#__PURE__*/React.createElement("span", {
-    key: p,
-    style: {
-      display: 'flex',
-      alignItems: 'center',
-      gap: 5,
-      fontSize: 11
-    }
-  }, /*#__PURE__*/React.createElement("svg", {
-    width: "18",
-    height: "4"
-  }, /*#__PURE__*/React.createElement("line", {
-    x1: "0",
-    y1: "2",
-    x2: "18",
-    y2: "2",
-    stroke: PC[p].hex,
-    strokeWidth: "2.5"
-  })), /*#__PURE__*/React.createElement("span", {
-    style: {
-      color: PC[p].hex,
-      fontWeight: 700
-    }
-  }, p))))), /*#__PURE__*/React.createElement("div", {
-    style: {
-      padding: '4px 8px 0',
-      overflowX: 'auto'
-    }
-  }, (() => {
-    const FW = 18,
-      FH = 12,
-      LANE_H = 16,
-      GAP = 2;
-    const LANE_Y = PLAYERS.map((_, i) => GAP + i * LANE_H);
-    const FLAG_STRIP_H = PLAYERS.length * LANE_H + GAP;
-    const CW = W,
-      CM = {
-        t: FLAG_STRIP_H + 12,
-        r: 52,
-        b: 36,
-        l: 42
-      };
-    const CH = CM.t + 140 + CM.b;
-    const CIW = CW - CM.l - CM.r,
-      CIH = CH - CM.t - CM.b;
-    const cxOf = i => CM.l + (n < 2 ? CIW / 2 : i / (n - 1) * CIW);
-    const cyOf = v => CM.t + CIH - v / 12 * CIH;
-    return /*#__PURE__*/React.createElement("svg", {
-      viewBox: `0 0 ${CW} ${CH}`,
-      width: "100%",
-      style: {
-        display: 'block',
-        minWidth: 380
-      }
-    }, PLAYERS.map((p, pi) => {
-      const laneY = LANE_Y[pi];
-      return /*#__PURE__*/React.createElement("g", {
-        key: p
-      }, /*#__PURE__*/React.createElement("rect", {
-        x: CM.l,
-        y: laneY,
-        width: CIW,
-        height: LANE_H - 1,
-        fill: PC[p].hex,
-        opacity: 0.10,
-        rx: 1
-      }), /*#__PURE__*/React.createElement("text", {
-        x: CM.l - 5,
-        y: laneY + 9,
-        textAnchor: "end",
-        fontSize: 8,
-        fontWeight: "800",
-        fill: PC[p].hex
-      }, OWNER_INITIALS[p]), timeline.map((t, i) => {
-        const teams = t.newClinches[p] || [];
-        if (!teams.length) return null;
-        const cx = cxOf(i);
-        const cy = cyOf(t.clinched[p] || 0);
-        const totalFW = teams.length * FW + (teams.length - 1) * 2;
-        return /*#__PURE__*/React.createElement("g", {
-          key: i
-        }, /*#__PURE__*/React.createElement("line", {
-          x1: cx,
-          y1: laneY + FH + 1,
-          x2: cx,
-          y2: cy - 5,
-          stroke: T.textFaint,
-          strokeWidth: 1,
-          strokeDasharray: "2,2",
-          opacity: 0.45
-        }), teams.map((team, fi) => {
-          const fx = cx - totalFW / 2 + fi * (FW + 2);
-          return /*#__PURE__*/React.createElement("svg", {
-            key: team,
-            x: fx,
-            y: laneY + 1,
-            width: FW,
-            height: FH,
-            viewBox: "0 0 30 20",
-            overflow: "hidden"
-          }, /*#__PURE__*/React.createElement("rect", {
-            width: "30",
-            height: "20",
-            fill: "white"
-          }), FLAG_SVGS[team], /*#__PURE__*/React.createElement("rect", {
-            width: "30",
-            height: "20",
-            fill: "none",
-            stroke: T.border,
-            strokeWidth: "2"
-          }));
-        }));
-      }));
-    }), /*#__PURE__*/React.createElement("line", {
-      x1: CM.l,
-      x2: CW - 4,
-      y1: CM.t - 6,
-      y2: CM.t - 6,
-      stroke: T.border,
-      strokeWidth: 1
-    }), Array.from({
-      length: 7
-    }, (_, i) => {
-      const v = i * 2,
-        y = cyOf(v);
-      return /*#__PURE__*/React.createElement("g", {
-        key: i
-      }, /*#__PURE__*/React.createElement("line", {
-        x1: CM.l,
-        x2: CM.l + CIW,
-        y1: y,
-        y2: y,
-        stroke: T.borderLight,
-        strokeWidth: i === 0 ? 1.5 : 0.75
-      }), /*#__PURE__*/React.createElement("text", {
-        x: CM.l - 5,
-        y: y + 4,
-        textAnchor: "end",
-        fontSize: 9,
-        fill: T.textFaint
-      }, v));
-    }), /*#__PURE__*/React.createElement("line", {
-      x1: CM.l,
-      x2: CM.l,
-      y1: CM.t,
-      y2: CM.t + CIH,
-      stroke: T.border,
-      strokeWidth: 1
-    }), timeline.map((pt, i) => {
-      if (!pt.label || xStep > 1 && i % xStep !== 0 && i !== n - 1) return null;
-      return /*#__PURE__*/React.createElement("text", {
-        key: i,
-        x: cxOf(i),
-        y: CH - 8,
-        textAnchor: "middle",
-        fontSize: 8,
-        fill: T.textFaint
-      }, pt.label);
-    }), PLAYERS.map((p, pi) => {
-      const pts = timeline.map((t, i) => [cxOf(i), cyOf(t.clinched[p] || 0)]);
-      const lastVal = timeline[n - 1].clinched[p] || 0;
-      const allFinals = PLAYERS.map(pp => timeline[n - 1].clinched[pp] || 0);
-      const sameCount = allFinals.filter(v => v === lastVal).length;
-      const nudge = sameCount > 1 ? pi % 2 === 0 ? -7 : 7 : 0;
-      return /*#__PURE__*/React.createElement("g", {
-        key: p
-      }, /*#__PURE__*/React.createElement("polyline", {
-        points: pts.map(([x, y]) => `${x},${y}`).join(' '),
-        fill: "none",
-        stroke: PC[p].hex,
-        strokeWidth: 2.5,
-        strokeLinejoin: "round",
-        strokeLinecap: "round"
-      }), pts.map(([cx, cy], i) => {
-        const hasClinch = (timeline[i].newClinches[p] || []).length > 0;
-        return hasClinch ? /*#__PURE__*/React.createElement("circle", {
-          key: i,
-          cx: cx,
-          cy: cy,
-          r: 4.5,
-          fill: PC[p].hex,
-          stroke: "#fff",
-          strokeWidth: 1.5
-        }) : /*#__PURE__*/React.createElement("circle", {
-          key: i,
-          cx: cx,
-          cy: cy,
-          r: 2.5,
-          fill: PC[p].hex
-        });
-      }), /*#__PURE__*/React.createElement("text", {
-        x: pts[n - 1][0] + 5,
-        y: pts[n - 1][1] + nudge,
-        fontSize: 9,
-        fontWeight: "700",
-        fill: PC[p].hex,
-        dominantBaseline: "middle"
-      }, lastVal));
-    }), /*#__PURE__*/React.createElement("text", {
-      x: CM.l - 28,
-      y: CM.t - 8,
-      fontSize: 9,
-      fill: T.textFaint,
-      textAnchor: "start"
-    }, "Teams"));
-  })())));
+  }, "Pts")))));
 }
 
 // ═══════════════════ KNOCKOUT TAB ═══════════════════
@@ -3826,14 +3777,29 @@ const bracketLeft = r => r * COL_W;
 const BRACKET_H = 16 * MATCH_UNIT;
 const BRACKET_W = 5 * COL_W;
 
-// Pre-match win probability from SEED_ODDS, normalized so both teams sum to 100%.
+// Pre-match win probability derived from WC win odds (much more accurate than R32
+// advancement odds for knockout matches). Falls back to SEED_ODDS if WC odds not loaded.
 // Returns [p1pct, p2pct] or null if either team is TBD/unknown.
 function matchWinProb(t1, t2) {
-  const p1 = SEED_ODDS[t1],
-    p2 = SEED_ODDS[t2];
-  if (!p1 || !p2 || !t1 || !t2 || t1 === 'TBD' || t2 === 'TBD') return null;
-  const total = p1 + p2;
-  return [Math.round(p1 / total * 100), Math.round(p2 / total * 100)];
+  var _wcOdds$t, _wcOdds$t2;
+  if (!t1 || !t2 || t1 === 'TBD' || t2 === 'TBD') return null;
+  if (!ALL_TEAMS.includes(t1) || !ALL_TEAMS.includes(t2)) return null;
+  // Use WC win probability if available — e.g. Brazil 15% vs Japan 2% → 88/12
+  // This is far more accurate than R32 odds for head-to-head knockout matches
+  const w1 = (_wcOdds$t = _wcOdds[t1]) !== null && _wcOdds$t !== void 0 ? _wcOdds$t : null;
+  const w2 = (_wcOdds$t2 = _wcOdds[t2]) !== null && _wcOdds$t2 !== void 0 ? _wcOdds$t2 : null;
+  if (w1 !== null && w2 !== null) {
+    const total = w1 + w2;
+    if (total === 0) return [50, 50];
+    const p1 = Math.round(w1 / total * 100);
+    return [Math.max(1, Math.min(99, p1)), Math.max(1, Math.min(99, 100 - p1))];
+  }
+  // Fallback: SEED_ODDS (pre-tournament advancement odds — less accurate but better than nothing)
+  const s1 = SEED_ODDS[t1],
+    s2 = SEED_ODDS[t2];
+  if (!s1 || !s2) return null;
+  const total = s1 + s2;
+  return [Math.round(s1 / total * 100), Math.round(s2 / total * 100)];
 }
 function BracketCard({
   t1,
@@ -4057,24 +4023,20 @@ function KnockoutTab({
     return acc;
   }, {});
 
-  // WC win probability per owner — proportional to their remaining teams' current odds,
-  // normalized so all four owners sum to exactly 100%.
-  // Uses live sportsbook odds (fetched each refresh) when available; falls back to
-  // pre-tournament seed odds when the live odds haven't loaded yet (e.g. ESPN path).
-  const rawWin = PLAYERS.reduce((acc, p) => {
+  // WC win probability per owner = direct sum of each owner's active teams' WC win odds
+  // from Polymarket's 'World Cup Winner' market (via _wcOdds module-level var).
+  // This is the actual probability the owner holds the WC winner, not normalized across owners.
+  const hasWCOdds = Object.keys(_wcOdds).length >= 20;
+  const wcProb = PLAYERS.reduce((acc, p) => {
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     acc[p] = myTeams.reduce((sum, t) => {
-      var _SEED_ODDS$t;
+      var _wcOdds$t3, _SEED_ODDS$t;
       if (knockoutLosers.has(t)) return sum;
       if (getClinch(t, stats, standings, groupEvents) === 'ELIMINATED') return sum;
-      const odds = liveOdds && liveOdds[t] != null ? liveOdds[t] : (_SEED_ODDS$t = SEED_ODDS[t]) !== null && _SEED_ODDS$t !== void 0 ? _SEED_ODDS$t : 0;
-      return sum + odds;
+      // Use Polymarket WC win probability if available; fall back to normalized SEED_ODDS
+      const prob = hasWCOdds ? (_wcOdds$t3 = _wcOdds[t]) !== null && _wcOdds$t3 !== void 0 ? _wcOdds$t3 : 0 : liveOdds && liveOdds[t] != null ? liveOdds[t] : (_SEED_ODDS$t = SEED_ODDS[t]) !== null && _SEED_ODDS$t !== void 0 ? _SEED_ODDS$t : 0;
+      return sum + prob;
     }, 0);
-    return acc;
-  }, {});
-  const totalRaw = Object.values(rawWin).reduce((a, b) => a + b, 0);
-  const wcProb = PLAYERS.reduce((acc, p) => {
-    acc[p] = totalRaw > 0 ? rawWin[p] / totalRaw : 0.25;
     return acc;
   }, {});
   return /*#__PURE__*/React.createElement("div", {
@@ -4090,13 +4052,15 @@ function KnockoutTab({
       gap: 10
     }
   }, PLAYERS.map(p => {
-    const pct = Math.round(wcProb[p] * 100);
+    const pct = Math.round(wcProb[p] * 100); // raw sum of WC win probs for this owner's teams
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     const activeTeamsForP = myTeams.filter(t => !knockoutLosers.has(t) && getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED');
     const topTeam = activeTeamsForP.length ? activeTeamsForP.reduce((best, t) => {
-      var _ref, _ref2, _ref3, _ref4;
-      const prob = (_ref = (_ref2 = liveOdds && liveOdds[t]) !== null && _ref2 !== void 0 ? _ref2 : SEED_ODDS[t]) !== null && _ref !== void 0 ? _ref : 0;
-      return prob > ((_ref3 = (_ref4 = liveOdds && liveOdds[best]) !== null && _ref4 !== void 0 ? _ref4 : SEED_ODDS[best]) !== null && _ref3 !== void 0 ? _ref3 : 0) ? t : best;
+      var _wcOdds$t4, _ref3, _ref4, _wcOdds$best, _ref5, _ref6;
+      // Use WC win odds for "most likely champion" (not R32 odds)
+      const prob = hasWCOdds ? (_wcOdds$t4 = _wcOdds[t]) !== null && _wcOdds$t4 !== void 0 ? _wcOdds$t4 : 0 : (_ref3 = (_ref4 = liveOdds && liveOdds[t]) !== null && _ref4 !== void 0 ? _ref4 : SEED_ODDS[t]) !== null && _ref3 !== void 0 ? _ref3 : 0;
+      const bestProb = hasWCOdds ? (_wcOdds$best = _wcOdds[best]) !== null && _wcOdds$best !== void 0 ? _wcOdds$best : 0 : (_ref5 = (_ref6 = liveOdds && liveOdds[best]) !== null && _ref6 !== void 0 ? _ref6 : SEED_ODDS[best]) !== null && _ref5 !== void 0 ? _ref5 : 0;
+      return prob > bestProb ? t : best;
     }, activeTeamsForP[0]) : null;
     return /*#__PURE__*/React.createElement("div", {
       key: p,
@@ -4189,7 +4153,7 @@ function KnockoutTab({
       fontSize: 9,
       color: T.textFaint
     }
-  }, "Normalized to 100% across all owners based on current odds for each owner's active teams."), /*#__PURE__*/React.createElement("div", {
+  }, "WC win % = direct sum of each owner's active teams' Polymarket Win WC odds. Most likely champion = owner's team with highest WC win probability."), /*#__PURE__*/React.createElement("div", {
     style: {
       background: T.card,
       border: `1px solid ${T.border}`,
@@ -4331,6 +4295,7 @@ function App() {
         matches: merged,
         liveOdds: freshOdds || liveOdds,
         liveStatus: _liveStatus,
+        wcOdds: _wcOdds,
         ts: now.getTime()
       });
       scheduleNext(source === 'espn' ? 60 * 1000 : 10 * 60 * 1000);
@@ -4358,6 +4323,7 @@ function App() {
         if (c.matches) setMatches(c.matches);
         if (c.liveOdds) setLiveOdds(c.liveOdds);
         if (c.liveStatus) updateLiveStatus(c.liveStatus);
+        if (c.wcOdds && typeof c.wcOdds === 'object') Object.assign(_wcOdds, c.wcOdds);
         if (c.ts) setLastUpdated(new Date(c.ts));
       }
       refresh();

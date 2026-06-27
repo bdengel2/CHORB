@@ -12,15 +12,7 @@
 <body>
 <div id="root"></div>
 <script>
-if (!window.storage) {
-  const mem = {};
-  window.storage = {
-    get: async (k) => (k in mem ? { key: k, value: mem[k] } : (() => { throw new Error('not found'); })()),
-    set: async (k, v) => { mem[k] = v; return { key: k, value: v }; },
-    delete: async (k) => { delete mem[k]; return { key: k, deleted: true }; },
-    list: async () => ({ keys: Object.keys(mem) }),
-  };
-}
+if (!window.storage) { const mem={}; window.storage={get:async(k)=>(k in mem?{key:k,value:mem[k]}:(()=>{throw new Error('nf')})()),set:async(k,v)=>{mem[k]=v;return{key:k,value:v}},delete:async(k)=>{delete mem[k];return{key:k,deleted:true}},list:async()=>({keys:Object.keys(mem)})}; }
 </script>
 <script>
 const {
@@ -1118,12 +1110,19 @@ Find ALL of the following:
 4. Per-team probability (0.0–1.0 decimal) of reaching the Round of 32, sourced from Polymarket's 'World Cup: Team to advance to Knockout Stages' market (polymarket.com/event/world-cup-team-to-advance-to-knockout-stages) or Neil Paine's tracker (neilpaine.substack.com/p/2026-world-cup-odds-tracker). These are team-specific independent probabilities — do NOT normalize within groups. Eliminated teams: 0.0. Clinched: 1.0.
 
 5. Per-team probability (0.0–1.0) of WINNING the World Cup (not just advancing), from Polymarket's 'World Cup Winner' market or Neil Paine's 'Win WC' column. Return as a separate 'wcOdds' object: {"Brazil":0.15,"France":0.18,...}. Eliminated teams: 0.0.
-6. Official advancement status — check fifa.com standings for the green (qualified) and red (eliminated) markers. For each team with a confirmed outcome include:
-   - FIRST = group winner
-   - SECOND = group runner-up  
-   - WILDCARD = qualified as one of the 8 best third-place teams
-   - ELIMINATED = officially out (either 4th in group, or 3rd but not in top-8 third-place ranking)
-   Only include teams with CONFIRMED outcomes. Crucially: third-place teams are only WILDCARD if FIFA has officially confirmed they are in the top 8 third-place finishers — otherwise omit them (their group may still be in progress or the third-place ranking may not yet be finalised).
+
+6. Official advancement status — sourced ONLY from FIFA.com's visual indicators at fifa.com/en/tournaments/mens/worldcup/canadamexicousa2026/standings, NOT from sportsbook odds. Sportsbooks often lag — a team at 99% on Polymarket does NOT mean they are confirmed.
+
+   GREEN marker on FIFA.com = officially confirmed advancing → include in status dict
+   RED marker on FIFA.com = officially eliminated → include as ELIMINATED
+   No marker = genuinely uncertain → OMIT from status dict
+
+   For GREEN-marker teams, use their CURRENT group standings position:
+   - 1st place in group → "FIRST"
+   - 2nd place in group → "SECOND"
+   - 3rd place AND confirmed in top-8 third-place ranking → "WILDCARD"
+   Include ALL green-marker teams even if their group's final match hasn't been played yet.
+   For 3rd-place teams: only mark WILDCARD if FIFA has officially placed them in the top-8 table.
 
 Respond with ONLY compact single-line JSON in this exact shape:
 {"standings":[{"team":"<name>","group":"<A-L>","mp":<int>,"w":<int>,"d":<int>,"l":<int>,"gf":<int>,"ga":<int>,"pts":<int>}],"matches":[{"stage":"group","group":"<A-L>","date":"<ISO 8601>","team1":"<name>","team2":"<name>","score1":<int or null>,"score2":<int or null>,"status":"<FT|LIVE|SCHEDULED>"}],"odds":{"Mexico":0.98,"Qatar":0.0},"wcOdds":{"Brazil":0.15,"France":0.18},"status":{"Mexico":"FIRST","Qatar":"ELIMINATED"}}
@@ -1460,15 +1459,16 @@ function parseESPNStandings(json) {
       if (isElim || colorRed && !colorGreen || textSaysElim && !textSaysQualified) {
         status[teamName] = 'ELIMINATED';
       } else if (isQualified || colorGreen || textSaysQualified) {
+        // Trust ESPN/FIFA green marker even if group isn't finished yet.
+        // Use current standing position as proxy when rank is ambiguous.
         if (textSaysWildcard) {
           status[teamName] = 'WILDCARD';
-        } else if (noteRank === 1) {
+        } else if (noteRank === 1 || pos === 0) {
           status[teamName] = 'FIRST';
-        } else if (noteRank === 2) {
+        } else if (noteRank === 2 || pos === 1) {
           status[teamName] = 'SECOND';
         } else {
-          // Qualified but rank unknown — infer from group position
-          status[teamName] = pos === 0 ? 'FIRST' : 'SECOND';
+          status[teamName] = 'WILDCARD'; // 3rd place with green note = confirmed wildcard
         }
       }
       results.push({
@@ -2065,8 +2065,39 @@ const KNOWN_STATUS = {
   // Group F — COMPLETE (final matchday June 25)
   'Netherlands': 'FIRST',
   'Japan': 'SECOND',
-  'Sweden': 'WILDCARD' // drew with Japan 1-1; all three advanced
+  'Sweden': 'WILDCARD',
+  // drew with Japan 1-1; all three advanced
   // Tunisia already in list above
+
+  // Group D — COMPLETE (final matchday June 26)
+  'USA': 'FIRST',
+  'Australia': 'SECOND',
+  'Turkey': 'ELIMINATED',
+  // Paraguay is 3rd (4pts, -2 GD) — wildcard status TBD pending top-8 ranking
+
+  // Group H — COMPLETE (final matchday June 26)
+  'Spain': 'FIRST',
+  'Cape Verde': 'SECOND',
+  // surprise runner-up; drew all three matches
+  'Uruguay': 'ELIMINATED',
+  // 3rd with only 2pts — not in top-8 thirds
+  'Saudi Arabia': 'ELIMINATED',
+  // Group I — COMPLETE (final matchday June 26)
+  'Norway': 'FIRST',
+  // beat France 4-1 to win group
+  'France': 'SECOND',
+  'Iraq': 'ELIMINATED',
+  // Senegal is 3rd (3pts, +2 GD) — wildcard status TBD
+
+  // Group G — Egypt confirmed advancing (user-verified June 26)
+  'Egypt': 'WILDCARD',
+  // 4pts minimum; actual position TBD from tonight's result
+
+  // Group L — Panama confirmed eliminated (0pts, cannot reach top-8 wildcard)
+  'Panama': 'ELIMINATED'
+  // England confirmed advancing (FIFA green marker) but exact position (1st/2nd/wildcard) TBD June 27
+  // Colombia confirmed advancing (6pts, FIFA green) but exact position (1st/2nd) TBD June 27
+  // Group K and L final matches June 27 — all other positions TBD
 };
 const hasClinchedAdvancement = (team, stats, standings, groupMatches) => {
   const k = _liveStatus[team] || KNOWN_STATUS[team];
@@ -4551,8 +4582,5 @@ function App() {
     }
   }, "Live scores via ESPN where reachable, with an AI web-search fallback inside the Claude.ai artifact sandbox — may lag actual play by a minute or two · 2026 FIFA World Cup · USA, Canada & Mexico")));
 }
-const root = ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
-</script>
-</body>
-</html>
+const root=ReactDOM.createRoot(document.getElementById('root'));root.render(React.createElement(App));
+</script></body></html>

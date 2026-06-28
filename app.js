@@ -2758,6 +2758,14 @@ function GroupStageTab({
     style: {
       padding: '10px 14px',
       borderBottom: `1px solid ${T.border}`,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      flexWrap: 'wrap',
+      gap: 8
+    }
+  }, /*#__PURE__*/React.createElement("span", {
+    style: {
       fontSize: 11,
       fontWeight: 700,
       color: T.textSecondary,
@@ -2765,6 +2773,28 @@ function GroupStageTab({
       letterSpacing: '0.6px'
     }
   }, "Group Results"), /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      gap: 12,
+      fontSize: 10,
+      color: T.textTertiary
+    }
+  }, /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: T.green,
+      fontWeight: 700
+    }
+  }, "✓"), " Advancing (Top 2)"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: '#c8860a',
+      fontWeight: 700
+    }
+  }, "W"), " Wildcard"), /*#__PURE__*/React.createElement("span", null, /*#__PURE__*/React.createElement("span", {
+    style: {
+      color: T.red,
+      fontWeight: 700
+    }
+  }, "✕"), " Eliminated"))), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: 12,
       display: 'grid',
@@ -2863,7 +2893,10 @@ function GroupStageTab({
         }
       }, /*#__PURE__*/React.createElement("td", {
         style: {
-          padding: '4px 6px',
+          padding: '4px 6px'
+        }
+      }, /*#__PURE__*/React.createElement("div", {
+        style: {
           display: 'flex',
           alignItems: 'center',
           gap: 4
@@ -2880,7 +2913,9 @@ function GroupStageTab({
           textOverflow: 'ellipsis',
           whiteSpace: 'nowrap'
         }
-      }, team), (clinch === 'FIRST' || clinch === 'SECOND') && /*#__PURE__*/React.createElement("span", {
+      }, team), PICKS[team] && /*#__PURE__*/React.createElement(OwnerBadge, {
+        owner: PICKS[team]
+      }), (clinch === 'FIRST' || clinch === 'SECOND') && /*#__PURE__*/React.createElement("span", {
         style: {
           fontSize: 8,
           color: T.green
@@ -2895,7 +2930,7 @@ function GroupStageTab({
           fontSize: 8,
           color: T.red
         }
-      }, "✕")), /*#__PURE__*/React.createElement("td", {
+      }, "✕"))), /*#__PURE__*/React.createElement("td", {
         style: {
           padding: '4px',
           textAlign: 'center',
@@ -3893,7 +3928,7 @@ function KnockoutTab({
 // ═══════════════════ MAIN APP ═══════════════════
 
 function App() {
-  const [activeTab, setActiveTab] = useState('groups');
+  const [activeTab, setActiveTab] = useState('knockout');
   const [standingsArr, setStandingsArr] = useState([]);
   const [matches, setMatches] = useState([]);
   const [liveOdds, setLiveOdds] = useState(null); // null = use SEED_ODDS fallback
@@ -4001,9 +4036,6 @@ function App() {
   const tabs = [{
     id: 'draft',
     label: 'Draft recap'
-  }, {
-    id: 'charts',
-    label: 'Charts & graphs'
   }, {
     id: 'groups',
     label: 'Group stage'

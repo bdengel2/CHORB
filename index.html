@@ -2450,16 +2450,6 @@ function GroupStageTab({
   standings,
   liveOdds
 }) {
-  const [sortKey, setSortKey] = useState('pts');
-  const [sortDir, setSortDir] = useState(-1);
-  const onHeaderClick = key => {
-    if (key === sortKey) {
-      setSortDir(d => -d);
-    } else {
-      setSortKey(key);
-      setSortDir(key === 'team' || key === 'group' ? 1 : -1);
-    }
-  };
   const playerTeams = PLAYERS.reduce((acc, p) => {
     acc[p] = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     return acc;
@@ -2467,7 +2457,13 @@ function GroupStageTab({
   const totals = player => {
     const teams = playerTeams[player];
     return teams.reduce((acc, t) => {
-      const s = stats[t];
+      const s = stats[t] || {
+        w: 0,
+        d: 0,
+        l: 0,
+        pts: 0,
+        mp: 0
+      };
       return {
         w: acc.w + s.w,
         d: acc.d + s.d,
@@ -2530,14 +2526,6 @@ function GroupStageTab({
   const liveNow = groupEvents.filter(e => e.state === 'in');
   const totalAlive = ALL_TEAMS.filter(t => getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED').length;
   const matchesPlayed = groupEvents.filter(e => e.completed).length;
-  const filteredTeams = filterOwner === 'ALL' ? activeTeams : activeTeams.filter(t => PICKS[t] === filterOwner);
-  const sortedTeams = [...filteredTeams].sort((a, b) => {
-    const va = getSortValue(a, sortKey, stats, standings, groupEvents, liveOdds);
-    const vb = getSortValue(b, sortKey, stats, standings, groupEvents, liveOdds);
-    if (va < vb) return -1 * sortDir;
-    if (va > vb) return 1 * sortDir;
-    return 0;
-  });
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',

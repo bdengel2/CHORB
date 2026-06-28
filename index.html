@@ -12,6 +12,9 @@
 <body>
 <div id="root"></div>
 <script>
+window.onerror=function(m,s,l,c,e){
+  document.getElementById('root').innerHTML='<div style="padding:20px;font-family:monospace;font-size:12px;background:#fee;border:2px solid #c00;margin:16px;border-radius:6px;white-space:pre-wrap">&#x274C; '+m+'\n'+(e&&e.stack||'')+'</div>';
+};
 if(!window.storage){var _m={};window.storage={
   get:function(k){return _m[k]!==undefined?Promise.resolve({key:k,value:_m[k]}):Promise.reject(new Error('nf'))},
   set:function(k,v){_m[k]=v;return Promise.resolve({key:k,value:v})},

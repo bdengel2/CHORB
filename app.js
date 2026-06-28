@@ -4073,7 +4073,7 @@ function App() {
     label: 'Group stage'
   }, {
     id: 'knockout',
-    label: 'Knockout bracket'
+    label: 'Knockout Stage'
   }];
   return /*#__PURE__*/React.createElement("div", {
     style: {
@@ -4227,4 +4227,4 @@ function App() {
   }, "Live scores via ESPN where reachable, with an AI web-search fallback inside the Claude.ai artifact sandbox — may lag actual play by a minute or two · 2026 FIFA World Cup · USA, Canada & Mexico")));
 }
 var root=ReactDOM.createRoot(document.getElementById('root'));
-root.render(React.createElement(App));
+root.render(React.createElement(ErrorBoundary,null,React.createElement(App)));

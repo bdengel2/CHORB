@@ -3925,6 +3925,38 @@ function KnockoutTab({
   })));
 }
 
+// ── Error boundary — catches render crashes and shows the error ────────────
+class ErrorBoundary extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      error: null
+    };
+  }
+  static getDerivedStateFromError(e) {
+    return {
+      error: e
+    };
+  }
+  render() {
+    if (this.state.error) {
+      return React.createElement('div', {
+        style: {
+          padding: 20,
+          margin: 16,
+          background: '#fee',
+          border: '2px solid #c00',
+          borderRadius: 6,
+          fontFamily: 'monospace',
+          fontSize: 12,
+          whiteSpace: 'pre-wrap'
+        }
+      }, '❌ Render error\n' + this.state.error.message + '\n\n' + (this.state.error.stack || ''));
+    }
+    return this.props.children;
+  }
+}
+
 // ═══════════════════ MAIN APP ═══════════════════
 
 function App() {
@@ -4177,13 +4209,13 @@ function App() {
     stats: stats,
     standings: standings,
     liveOdds: liveOdds
-  }), activeTab === 'knockout' && /*#__PURE__*/React.createElement(KnockoutTab, {
+  }), activeTab === 'knockout' && /*#__PURE__*/React.createElement(ErrorBoundary, null, /*#__PURE__*/React.createElement(KnockoutTab, {
     knockoutEvents: knockoutEvents,
     stats: stats,
     standings: standings,
     groupEvents: groupEvents,
     liveOdds: liveOdds
-  }), /*#__PURE__*/React.createElement("div", {
+  })), /*#__PURE__*/React.createElement("div", {
     style: {
       marginTop: 24,
       paddingTop: 12,

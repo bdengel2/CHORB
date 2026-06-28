@@ -990,45 +990,45 @@ const KO_SIZES = {
   Final: 1
 };
 const R32_SEEDS = [
-// R16 match 1: Canada/SA winner vs Netherlands/Morocco winner  
-['1B', '2A'],
-// Canada vs South Africa
+// Pair 0-1 → R16: Canada/SA winner vs Netherlands/Morocco winner
+['2B', '2A'],
+// Canada (B2) vs South Africa (A2)       June 28
 ['1F', '2C'],
-// Netherlands vs Morocco
-// R16 match 2: Brazil/Japan winner vs Germany/Paraguay winner
+// Netherlands (F1) vs Morocco (C2)        June 29
+// Pair 2-3 → R16: Brazil/Japan winner vs Germany/Paraguay winner
 ['1C', '2F'],
-// Brazil vs Japan
+// Brazil (C1) vs Japan (F2)               June 29
 ['1E', '3D'],
-// Germany vs Paraguay (D wildcard)
-// R16 match 3: Ivory Coast/Norway winner vs France/Sweden winner
+// Germany (E1) vs Paraguay (D3 wc)        June 29
+// Pair 4-5 → R16: Ivory Coast/Norway winner vs France/Sweden winner
 ['2E', '1I'],
-// Ivory Coast vs Norway
+// Ivory Coast (E2) vs Norway (I1)         June 30
 ['2I', '3F'],
-// France vs Sweden (F wildcard)
-// R16 match 4: Mexico/Ecuador winner vs Switzerland/Algeria winner
+// France (I2) vs Sweden (F3 wc)           June 30
+// Pair 6-7 → R16: Mexico/Ecuador winner vs Switzerland/Algeria winner
 ['1A', '3E'],
-// Mexico vs Ecuador (E wildcard)
-['2B', '3J'],
-// Switzerland vs Algeria (J wildcard)
-// R16 match 5: Belgium/Senegal winner vs USA/Bosnia winner
+// Mexico (A1) vs Ecuador (E3 wc)          June 30
+['1B', '3J'],
+// Switzerland (B1) vs Algeria (J3 wc)     TBD
+// Pair 8-9 → R16: Belgium/Senegal winner vs USA/Bosnia winner
 ['1G', '3I'],
-// Belgium vs Senegal (I wildcard)
+// Belgium (G1) vs Senegal (I3 wc)         July 1
 ['1D', '3B'],
-// USA vs Bosnia (B wildcard)
-// R16 match 6: England/DR Congo winner vs Portugal/Croatia winner
+// USA (D1) vs Bosnia (B3 wc)              July 1
+// Pair 10-11 → R16: England/DR Congo winner vs Portugal/Croatia winner
 ['1L', '3K'],
-// England vs DR Congo (K wildcard)
+// England (L1) vs DR Congo (K3 wc)        July 1
 ['2K', '3L'],
-// Portugal vs Croatia (L wildcard)
-// R16 match 7: Spain/Austria winner vs Argentina/Cape Verde winner
+// Portugal (K2) vs Croatia (L3 wc)        July 2
+// Pair 12-13 → R16: Spain/Austria winner vs Argentina/Cape Verde winner
 ['1H', '2J'],
-// Spain vs Austria
+// Spain (H1) vs Austria (J2)              July 2
 ['1J', '2H'],
-// Argentina vs Cape Verde
-// R16 match 8: Colombia/Ghana winner vs Egypt/? winner
+// Argentina (J1) vs Cape Verde (H2)       TBD
+// Pair 14-15 → R16: Colombia/Ghana winner vs Australia/Egypt winner
 ['1K', '2L'],
-// Colombia vs Ghana
-['2G', '3A'] // Egypt vs South Korea wildcard (provisional)
+// Colombia (K1) vs Ghana (L2)             TBD
+['2D', '2G'] // Australia (D2) vs Egypt (G2)            July 3
 ];
 
 // ═══════════════════ TEAM NAME NORMALIZATION ═══════════════════
@@ -3621,52 +3621,60 @@ function BracketCard({
     own,
     score,
     prob
-  }, idx) => /*#__PURE__*/React.createElement("div", {
-    key: idx,
-    style: {
-      padding: '5px 7px',
-      display: 'flex',
-      alignItems: 'center',
-      gap: 4,
-      minHeight: 26,
-      borderTop: idx === 1 ? `1px solid ${T.borderLight}` : 'none',
-      background: team && winner === team ? own ? PC[own].subtle : T.accentSubtle : 'transparent'
-    }
-  }, team && /*#__PURE__*/React.createElement(Flag, {
-    team: team,
-    size: 13
-  }), /*#__PURE__*/React.createElement("span", {
-    style: {
-      flex: 1,
-      color: team && winner === team ? T.textPrimary : own ? PC[own].hex : T.textSecondary,
-      fontWeight: team && winner === team ? 700 : own ? 600 : 400,
-      overflow: 'hidden',
-      textOverflow: 'ellipsis',
-      whiteSpace: 'nowrap',
-      fontSize: 10
-    }
-  }, team && winner === team ? '🏆 ' : '', team || ''), team && /*#__PURE__*/React.createElement(OwnerBadge, {
-    owner: own
-  }), team && prob !== null && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 10,
-      fontWeight: 600,
-      color: completed || isLive ? T.textFaint : T.textSecondary,
-      opacity: completed || isLive ? 0.6 : 1,
-      fontVariantNumeric: 'tabular-nums',
-      flexShrink: 0,
-      minWidth: 26,
-      textAlign: 'right'
-    }
-  }, prob, "%"), showScore && score !== null && score !== undefined && /*#__PURE__*/React.createElement("span", {
-    style: {
-      fontSize: 11,
-      fontWeight: 700,
-      color: team && winner === team ? T.accent : T.textTertiary,
-      marginLeft: 2,
-      flexShrink: 0
-    }
-  }, score))), (city || date) && /*#__PURE__*/React.createElement("div", {
+  }, idx) => {
+    const isWinner = completed && team && winner === team;
+    const isLoser = completed && team && winner && winner !== team;
+    return /*#__PURE__*/React.createElement("div", {
+      key: idx,
+      style: {
+        padding: '5px 7px',
+        display: 'flex',
+        alignItems: 'center',
+        gap: 3,
+        minHeight: 26,
+        borderTop: idx === 1 ? `1px solid ${T.borderLight}` : 'none',
+        background: isWinner ? 'rgba(16,122,64,0.13)' : 'transparent',
+        opacity: isLoser ? 0.55 : 1
+      }
+    }, team && /*#__PURE__*/React.createElement(Flag, {
+      team: team,
+      size: 13
+    }), isWinner && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        lineHeight: 1
+      }
+    }, "🏆"), /*#__PURE__*/React.createElement("span", {
+      style: {
+        flex: 1,
+        fontWeight: isWinner ? 700 : own ? 600 : 400,
+        fontSize: 10,
+        color: isLoser ? T.textFaint : isWinner && own ? PC[own].hex : own ? PC[own].hex : T.textSecondary,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, team || ''), team && !isLoser && /*#__PURE__*/React.createElement(OwnerBadge, {
+      owner: own
+    }), team && prob !== null && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 9,
+        color: T.textFaint,
+        fontVariantNumeric: 'tabular-nums',
+        flexShrink: 0,
+        minWidth: 22,
+        textAlign: 'right'
+      }
+    }, prob, "%"), showScore && score !== null && score !== undefined && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 11,
+        fontWeight: 700,
+        color: isWinner ? T.textPrimary : T.textFaint,
+        marginLeft: 2,
+        flexShrink: 0
+      }
+    }, score));
+  }), (city || date) && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '1px 7px 3px',
       fontSize: 7,
@@ -3771,7 +3779,15 @@ function KnockoutTab({
   };
   const getRoundSlots = round => {
     const real = knockoutEvents.filter(e => e.round === round).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
-    if (round === 'R32' && usingProjection) return projectedR32;
+    if (round === 'R32') {
+      if (usingProjection) return projectedR32;
+      // Match real ESPN R32 matches to their correct bracket positions by team names
+      return projectedR32.map(seed => {
+        if (!seed.t1 || !seed.t2 || seed.t1 === 'TBD' || seed.t2 === 'TBD') return seed;
+        const match = real.find(m => m.t1 && m.t2 && (m.t1 === seed.t1 && m.t2 === seed.t2 || m.t1 === seed.t2 && m.t2 === seed.t1));
+        return match || seed;
+      });
+    }
     const size = KO_SIZES[round];
     // For rounds after R32, project from previous round winners if real data is sparse
     const prevRound = {
@@ -3857,29 +3873,49 @@ function KnockoutTab({
       gap: 10
     }
   }, PLAYERS.map(p => {
-    const pct = Math.round(wcProb[p] * 100); // raw sum of WC win probs for this owner's teams
+    const pct = Math.round(wcProb[p] * 100);
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     const activeTeamsForP = myTeams.filter(t => !knockoutLosers.has(t) && getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED');
-    const topTeam = activeTeamsForP.length ? activeTeamsForP.reduce((best, t) => {
-      var _wcOdds$t4, _SEED_WC_ODDS$t4, _wcOdds$best, _SEED_WC_ODDS$best;
-      // Use WC win odds for "most likely champion" (not R32 odds)
-      const prob = hasWCOdds ? (_wcOdds$t4 = _wcOdds[t]) !== null && _wcOdds$t4 !== void 0 ? _wcOdds$t4 : 0 : (_SEED_WC_ODDS$t4 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t4 !== void 0 ? _SEED_WC_ODDS$t4 : 0;
-      const bestProb = hasWCOdds ? (_wcOdds$best = _wcOdds[best]) !== null && _wcOdds$best !== void 0 ? _wcOdds$best : 0 : (_SEED_WC_ODDS$best = SEED_WC_ODDS[best]) !== null && _SEED_WC_ODDS$best !== void 0 ? _SEED_WC_ODDS$best : 0;
-      return prob > bestProb ? t : best;
-    }, activeTeamsForP[0]) : null;
+    const numActive = activeTeamsForP.length;
+    const getProb = t => {
+      var _wcOdds$t4, _SEED_WC_ODDS$t4;
+      return hasWCOdds ? (_wcOdds$t4 = _wcOdds[t]) !== null && _wcOdds$t4 !== void 0 ? _wcOdds$t4 : 0 : (_SEED_WC_ODDS$t4 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t4 !== void 0 ? _SEED_WC_ODDS$t4 : 0;
+    };
+    const topTeam = numActive > 0 ? activeTeamsForP.reduce((best, t) => getProb(t) > getProb(best) ? t : best, activeTeamsForP[0]) : null;
+    const underdogTeam = numActive > 1 ? activeTeamsForP.filter(t => getProb(t) > 0).reduce((worst, t) => getProb(t) < getProb(worst) ? t : worst, activeTeamsForP[0]) : null;
+    const noTeams = numActive === 0;
     return /*#__PURE__*/React.createElement("div", {
       key: p,
       style: {
-        background: T.card,
+        position: 'relative',
+        background: noTeams ? T.cardAlt : T.card,
         border: `1px solid ${T.border}`,
         borderTop: `3px solid ${PC[p].hex}`,
         borderRadius: 4,
         padding: '12px 14px',
         display: 'flex',
         flexDirection: 'column',
-        gap: 6
+        gap: 6,
+        opacity: noTeams ? 0.65 : 1
       }
-    }, /*#__PURE__*/React.createElement("div", {
+    }, noTeams && /*#__PURE__*/React.createElement("div", {
+      style: {
+        position: 'absolute',
+        inset: 0,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        pointerEvents: 'none',
+        zIndex: 1
+      }
+    }, /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 56,
+        color: T.red,
+        opacity: 0.2,
+        lineHeight: 1
+      }
+    }, "✕")), /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 13,
         fontWeight: 800,
@@ -3926,15 +3962,16 @@ function KnockoutTab({
         background: PC[p].hex,
         borderRadius: 2
       }
-    }))), topTeam && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    }))), numActive === 1 && topTeam && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
       style: {
         fontSize: 9,
-        color: T.textFaint,
+        color: T.red,
         textTransform: 'uppercase',
         letterSpacing: '0.5px',
+        fontWeight: 700,
         marginBottom: 3
       }
-    }, "Most likely champion"), /*#__PURE__*/React.createElement("div", {
+    }, "⚡ Last Chance!"), /*#__PURE__*/React.createElement("div", {
       style: {
         display: 'flex',
         alignItems: 'center',
@@ -3952,7 +3989,58 @@ function KnockoutTab({
         textOverflow: 'ellipsis',
         whiteSpace: 'nowrap'
       }
-    }, topTeam))));
+    }, topTeam))), numActive > 1 && topTeam && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: T.textFaint,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        marginBottom: 3
+      }
+    }, "Most likely champion"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 5
+      }
+    }, /*#__PURE__*/React.createElement(Flag, {
+      team: topTeam,
+      size: 13
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: T.textPrimary,
+        fontWeight: 700,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, topTeam))), numActive > 1 && underdogTeam && underdogTeam !== topTeam && /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+      style: {
+        fontSize: 9,
+        color: T.textFaint,
+        textTransform: 'uppercase',
+        letterSpacing: '0.5px',
+        marginBottom: 3
+      }
+    }, "Biggest underdog"), /*#__PURE__*/React.createElement("div", {
+      style: {
+        display: 'flex',
+        alignItems: 'center',
+        gap: 5
+      }
+    }, /*#__PURE__*/React.createElement(Flag, {
+      team: underdogTeam,
+      size: 13
+    }), /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 10,
+        color: T.textSecondary,
+        overflow: 'hidden',
+        textOverflow: 'ellipsis',
+        whiteSpace: 'nowrap'
+      }
+    }, underdogTeam))));
   })), /*#__PURE__*/React.createElement("div", {
     style: {
       fontSize: 9,

@@ -1332,8 +1332,8 @@ const ESPN_DATE_WINDOWS = ['20260611-20260616',
 ];
 const ESPN_STANDINGS_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/standings';
 const KO_DATE_RANGES = {
-  R32: ['2026-06-28', '2026-07-03'],
-  R16: ['2026-07-04', '2026-07-07'],
+  R32: ['2026-06-28', '2026-07-05'],
+  R16: ['2026-07-07', '2026-07-10'],
   QF: ['2026-07-09', '2026-07-11'],
   SF: ['2026-07-14', '2026-07-15'],
   Third: ['2026-07-18', '2026-07-18'],
@@ -2023,64 +2023,71 @@ const SEED_WC_ODDS = {
 // Values: 'FIRST' | 'SECOND' | 'WILDCARD' | 'ELIMINATED'
 // Only add entries for groups that are 100% complete or individually confirmed.
 const KNOWN_STATUS = {
-  // Group A — COMPLETE (final matchday June 24)
+  // Group A — COMPLETE: Mexico 9pts, South Africa 4pts, South Korea 3pts (eliminated - not top-8), Czechia 1pt
   'Mexico': 'FIRST',
-  // 9pts, 3W
   'South Africa': 'SECOND',
-  // 4pts, 1W 1D 1L
+  'South Korea': 'ELIMINATED',
+  // 3rd with 3pts, failed top-8 wildcard ranking
   'Czechia': 'ELIMINATED',
-  // 1pt, 4th
-
-  // Group B — COMPLETE
+  // Group B — COMPLETE: Switzerland FIRST, Canada SECOND, Bosnia WILDCARD, Qatar ELIMINATED
   'Switzerland': 'FIRST',
   'Canada': 'SECOND',
   'Bosnia and Herzegovina': 'WILDCARD',
-  // 3rd, qualified as wildcard
   'Qatar': 'ELIMINATED',
-  // Individually confirmed eliminated:
+  // Group D — COMPLETE: USA FIRST, Australia SECOND, Paraguay ELIMINATED (3rd, not top-8), Turkey ELIMINATED
+  'USA': 'FIRST',
+  'Australia': 'SECOND',
+  'Paraguay': 'ELIMINATED',
+  // 3rd with 4pts but -2 GD, failed top-8 wildcard ranking
   'Turkey': 'ELIMINATED',
-  'Tunisia': 'ELIMINATED',
-  'Jordan': 'ELIMINATED',
-  'Panama': 'ELIMINATED',
-  // Group E — COMPLETE (final matchday June 25)
+  // Group E — COMPLETE: Germany FIRST, Ivory Coast SECOND, Ecuador WILDCARD, Curaçao ELIMINATED
   'Germany': 'FIRST',
   'Ivory Coast': 'SECOND',
   'Ecuador': 'WILDCARD',
-  // beat Germany 2-1; qualified as 3rd-place wildcard
   'Curaçao': 'ELIMINATED',
-  // Group F — COMPLETE (final matchday June 25)
+  // Group F — COMPLETE: Netherlands FIRST, Japan SECOND, Sweden WILDCARD, Tunisia ELIMINATED
   'Netherlands': 'FIRST',
   'Japan': 'SECOND',
   'Sweden': 'WILDCARD',
-  // drew with Japan 1-1; all three advanced
-  // Tunisia already in list above
-
-  // Group D — COMPLETE (final matchday June 26)
-  'USA': 'FIRST',
-  'Australia': 'SECOND',
-  'Turkey': 'ELIMINATED',
-  // Paraguay is 3rd (4pts, -2 GD) — wildcard status TBD pending top-8 ranking
-
-  // Group H — COMPLETE (final matchday June 26)
+  'Tunisia': 'ELIMINATED',
+  // Group G — COMPLETE: Belgium 5pts FIRST (GD+5), Egypt 5pts SECOND (GD+2), Iran ELIMINATED, NZ ELIMINATED
+  'Belgium': 'FIRST',
+  'Egypt': 'SECOND',
+  // was incorrectly set to WILDCARD — Egypt finished 2nd
+  'Iran': 'ELIMINATED',
+  // 3pts, 3rd, out-performed by other 3rd-place teams
+  'New Zealand': 'ELIMINATED',
+  // Group H — COMPLETE: Spain FIRST, Cape Verde SECOND, Uruguay ELIMINATED, Saudi Arabia ELIMINATED
   'Spain': 'FIRST',
   'Cape Verde': 'SECOND',
-  // surprise runner-up; drew all three matches
   'Uruguay': 'ELIMINATED',
-  // 3rd with only 2pts — not in top-8 thirds
   'Saudi Arabia': 'ELIMINATED',
-  // Group I — COMPLETE (final matchday June 26)
+  // Group I — COMPLETE: Norway FIRST, France SECOND, Senegal WILDCARD (confirmed R32 vs Belgium), Iraq ELIMINATED
   'Norway': 'FIRST',
-  // beat France 4-1 to win group
   'France': 'SECOND',
+  'Senegal': 'WILDCARD',
   'Iraq': 'ELIMINATED',
-  // Senegal is 3rd (3pts, +2 GD) — wildcard status TBD
-
-  // Group G — Egypt confirmed advancing (user-verified June 26)
-  'Egypt': 'WILDCARD',
-  // 4pts minimum; actual position TBD from tonight's result
-
-  // Group L — Panama confirmed eliminated (0pts, cannot reach top-8 wildcard)
+  // Group J — COMPLETE: Argentina 7pts FIRST, Austria 4pts SECOND, Algeria ELIMINATED, Jordan ELIMINATED
+  'Argentina': 'FIRST',
+  'Austria': 'SECOND',
+  'Algeria': 'ELIMINATED',
+  // 4pts 3rd but GD-2, failed top-8 ranking
+  'Jordan': 'ELIMINATED',
+  // Group K — COMPLETE: Colombia FIRST, Portugal SECOND, DR Congo WILDCARD (confirmed R32 vs England), Uzbekistan ELIMINATED
+  'Colombia': 'FIRST',
+  'Portugal': 'SECOND',
+  'DR Congo': 'WILDCARD',
+  'Uzbekistan': 'ELIMINATED',
+  // Group L — COMPLETE: England FIRST, Ghana SECOND, Croatia WILDCARD (confirmed R32 vs Portugal), Panama ELIMINATED
+  'England': 'FIRST',
+  // was incorrectly set to SECOND
+  'Ghana': 'SECOND',
+  // was incorrectly set to WILDCARD
+  'Croatia': 'WILDCARD',
+  // confirmed R32 match vs Portugal
   'Panama': 'ELIMINATED'
+
+  // Group C — results not yet available; handled by live data
 };
 const hasClinchedAdvancement = (team, stats, standings, groupMatches) => {
   const k = _liveStatus[team] || KNOWN_STATUS[team];
@@ -3550,7 +3557,7 @@ function BracketCard({
       overflow: 'hidden',
       fontSize: 11
     }
-  }, bothKnown && !completed && !isLive && probs && /*#__PURE__*/React.createElement("div", {
+  }, bothKnown && probs && /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '2px 7px',
       fontSize: 7,
@@ -3592,11 +3599,12 @@ function BracketCard({
     }
   }, team || ''), team && /*#__PURE__*/React.createElement(OwnerBadge, {
     owner: own
-  }), team && prob !== null && !showScore && /*#__PURE__*/React.createElement("span", {
+  }), team && prob !== null && /*#__PURE__*/React.createElement("span", {
     style: {
       fontSize: 10,
       fontWeight: 600,
-      color: T.textSecondary,
+      color: completed || isLive ? T.textFaint : T.textSecondary,
+      opacity: completed || isLive ? 0.6 : 1,
       fontVariantNumeric: 'tabular-nums',
       flexShrink: 0,
       minWidth: 26,
@@ -3739,18 +3747,20 @@ function KnockoutTab({
   // from Polymarket's 'World Cup Winner' market (via _wcOdds module-level var).
   // This is the actual probability the owner holds the WC winner, not normalized across owners.
   const hasWCOdds = Object.keys(_wcOdds).length >= 20;
-  const wcProb = PLAYERS.reduce((acc, p) => {
+  const wcProbRaw = PLAYERS.reduce((acc, p) => {
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     acc[p] = myTeams.reduce((sum, t) => {
       var _wcOdds$t3, _SEED_WC_ODDS$t3;
       if (knockoutLosers.has(t)) return sum;
       if (getClinch(t, stats, standings, groupEvents) === 'ELIMINATED') return sum;
-      // Use Polymarket WC win probability if available; fall back to normalized SEED_ODDS
-      const prob = hasWCOdds ? (_wcOdds$t3 = _wcOdds[t]) !== null && _wcOdds$t3 !== void 0 ? _wcOdds$t3 : 0 : (_SEED_WC_ODDS$t3 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t3 !== void 0 ? _SEED_WC_ODDS$t3 : 0; // SEED_WC_ODDS is a better fallback than R32 odds
+      const prob = hasWCOdds ? (_wcOdds$t3 = _wcOdds[t]) !== null && _wcOdds$t3 !== void 0 ? _wcOdds$t3 : 0 : (_SEED_WC_ODDS$t3 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t3 !== void 0 ? _SEED_WC_ODDS$t3 : 0;
       return sum + prob;
     }, 0);
     return acc;
   }, {});
+  // Normalize so all 4 owners sum to exactly 100%
+  const wcProbTotal = Object.values(wcProbRaw).reduce((a, b) => a + b, 0);
+  const wcProb = wcProbTotal > 0 ? Object.fromEntries(PLAYERS.map(p => [p, wcProbRaw[p] / wcProbTotal])) : Object.fromEntries(PLAYERS.map(p => [p, 0.25]));
   return /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
@@ -3865,7 +3875,7 @@ function KnockoutTab({
       fontSize: 9,
       color: T.textFaint
     }
-  }, "WC win % = direct sum of each owner's active teams' Polymarket Win WC odds. Most likely champion = owner's team with highest WC win probability."), /*#__PURE__*/React.createElement("div", {
+  }, "WC win % normalized across all owners based on Polymarket Win WC odds for active teams. Most likely champion = owner's team with highest WC win probability."), /*#__PURE__*/React.createElement("div", {
     style: {
       background: T.card,
       border: `1px solid ${T.border}`,

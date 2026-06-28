@@ -3493,6 +3493,25 @@ function matchWinProb(t1, t2) {
   const p = Math.round(s1 / (s1 + s2) * 100);
   return [Math.max(1, Math.min(99, p)), Math.max(1, Math.min(99, 100 - p))];
 }
+
+// Convert UTC ISO 8601 to Central Daylight Time (UTC-5, summer) formatted as "M/D H:MMam/pm"
+const formatCT = dateStr => {
+  if (!dateStr) return null;
+  try {
+    const d = new Date(dateStr);
+    if (isNaN(d)) return null;
+    const ct = new Date(d.getTime() - 5 * 60 * 60 * 1000); // CDT = UTC-5
+    const mo = ct.getUTCMonth() + 1;
+    const day = ct.getUTCDate();
+    let h = ct.getUTCHours();
+    const m = String(ct.getUTCMinutes()).padStart(2, '0');
+    const ampm = h >= 12 ? 'pm' : 'am';
+    h = h % 12 || 12;
+    return m === '00' ? `${mo}/${day} ${h}${ampm}` : `${mo}/${day} ${h}:${m}${ampm}`;
+  } catch {
+    return null;
+  }
+};
 function BracketCard({
   t1,
   t2,

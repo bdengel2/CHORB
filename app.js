@@ -990,45 +990,58 @@ const KO_SIZES = {
   Final: 1
 };
 const R32_SEEDS = [
-// Pair 0-1 → R16: Canada/SA winner vs Netherlands/Morocco winner
-['2B', '2A'],
-// Canada (B2) vs South Africa (A2)       June 28
-['1F', '2C'],
-// Netherlands (F1) vs Morocco (C2)        June 29
-// Pair 2-3 → R16: Brazil/Japan winner vs Germany/Paraguay winner
-['1C', '2F'],
-// Brazil (C1) vs Japan (F2)               June 29
+// ESPN bracket positions W1-W16 (left-to-right visual order)
+// R16 pairings are non-sequential — see R16_PAIRS below
 ['1E', '3D'],
-// Germany (E1) vs Paraguay (D3 wc)        June 29
-// Pair 4-5 → R16: Ivory Coast/Norway winner vs France/Sweden winner
-['2E', '1I'],
-// Ivory Coast (E2) vs Norway (I1)         June 30
+// W1:  Germany      vs Paraguay      June 29
 ['2I', '3F'],
-// France (I2) vs Sweden (F3 wc)           June 30
-// Pair 6-7 → R16: Mexico/Ecuador winner vs Switzerland/Algeria winner
-['1A', '3E'],
-// Mexico (A1) vs Ecuador (E3 wc)          June 30
-['1B', '3J'],
-// Switzerland (B1) vs Algeria (J3 wc)     TBD
-// Pair 8-9 → R16: Belgium/Senegal winner vs USA/Bosnia winner
-['1G', '3I'],
-// Belgium (G1) vs Senegal (I3 wc)         July 1
-['1D', '3B'],
-// USA (D1) vs Bosnia (B3 wc)              July 1
-// Pair 10-11 → R16: England/DR Congo winner vs Portugal/Croatia winner
-['1L', '3K'],
-// England (L1) vs DR Congo (K3 wc)        July 1
+// W2:  France        vs Sweden        June 30
+['2A', '2B'],
+// W3:  South Africa  vs Canada        June 28
+['1F', '2C'],
+// W4:  Netherlands   vs Morocco       June 29
 ['2K', '3L'],
-// Portugal (K2) vs Croatia (L3 wc)        July 2
-// Pair 12-13 → R16: Spain/Austria winner vs Argentina/Cape Verde winner
+// W5:  Portugal      vs Croatia       July 2
 ['1H', '2J'],
-// Spain (H1) vs Austria (J2)              July 2
+// W6:  Spain         vs Austria       July 2
+['1D', '3B'],
+// W7:  USA           vs Bosnia        July 1
+['1G', '3I'],
+// W8:  Belgium       vs Senegal       July 1
+['1C', '2F'],
+// W9:  Brazil        vs Japan         June 29
+['2E', '1I'],
+// W10: Ivory Coast   vs Norway        June 30
+['1A', '3E'],
+// W11: Mexico        vs Ecuador       June 30
+['1L', '3K'],
+// W12: England       vs DR Congo      July 1
 ['1J', '2H'],
-// Argentina (J1) vs Cape Verde (H2)       TBD
-// Pair 14-15 → R16: Colombia/Ghana winner vs Australia/Egypt winner
-['1K', '2L'],
-// Colombia (K1) vs Ghana (L2)             TBD
-['2D', '2G'] // Australia (D2) vs Egypt (G2)            July 3
+// W13: Argentina     vs Cape Verde    July 3
+['2D', '2G'],
+// W14: Australia     vs Egypt         July 3
+['1B', '3J'],
+// W15: Switzerland   vs Algeria       July 3
+['1K', '2L'] // W16: Colombia      vs Ghana         July 4
+];
+
+// R16 pairings from ESPN bracket (indices into R32_SEEDS 0-based)
+// W1 vs W3, W2 vs W5, W4 vs W6, W7 vs W8, W9 vs W10, W11 vs W12, W13 vs W15, W14 vs W16
+const R16_PAIRS = [[0, 2],
+// R16-0: Germany/Paraguay vs SA/Canada          Jul 4
+[1, 4],
+// R16-1: France/Sweden vs Portugal/Croatia       Jul 4
+[3, 5],
+// R16-2: Netherlands/Morocco vs Spain/Austria    Jul 5
+[6, 7],
+// R16-3: USA/Bosnia vs Belgium/Senegal           Jul 5
+[8, 9],
+// R16-4: Brazil/Japan vs Ivory Coast/Norway      Jul 6
+[10, 11],
+// R16-5: Mexico/Ecuador vs England/Congo DR      Jul 6
+[12, 14],
+// R16-6: Argentina/Cape Verde vs Swiss/Algeria   Jul 7
+[13, 15] // R16-7: Australia/Egypt vs Colombia/Ghana       Jul 7
 ];
 
 // ═══════════════════ TEAM NAME NORMALIZATION ═══════════════════
@@ -1373,7 +1386,7 @@ const ESPN_DATE_WINDOWS = ['20260611-20260616',
 const ESPN_STANDINGS_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/standings';
 const KO_DATE_RANGES = {
   R32: ['2026-06-28', '2026-07-05'],
-  R16: ['2026-07-07', '2026-07-10'],
+  R16: ['2026-07-04', '2026-07-07'],
   QF: ['2026-07-09', '2026-07-11'],
   SF: ['2026-07-14', '2026-07-15'],
   Third: ['2026-07-18', '2026-07-18'],
@@ -1405,7 +1418,6 @@ function getRoundForDate(isoDate) {
 function parseESPNEvents(json) {
   const events = json && json.events || [];
   return events.map(ev => {
-    var _comp$notes;
     const comp = ev.competitions && ev.competitions[0] || {};
     const statusType = comp.status && comp.status.type || {};
     const competitors = comp.competitors || [];
@@ -1414,7 +1426,7 @@ function parseESPNEvents(json) {
 
     // Try multiple formats ESPN uses for group identification:
     // "Group A" (letter), "Group 1"–"Group 12" (number), "Group Stage - Group A", etc.
-    const note = comp.altGameNote || ((_comp$notes = comp.notes) === null || _comp$notes === void 0 || (_comp$notes = _comp$notes[0]) === null || _comp$notes === void 0 ? void 0 : _comp$notes.text) || ev.name || '';
+    const note = comp.altGameNote || comp.notes?.[0]?.text || ev.name || '';
     const letterMatch = /Group\s+([A-L])\b/i.exec(note);
     const numberMatch = /Group\s+(\d{1,2})\b/i.exec(note);
     const group = letterMatch ? letterMatch[1].toUpperCase() : numberMatch ? GROUP_NUM_TO_LETTER[parseInt(numberMatch[1])] || null : null;
@@ -1460,7 +1472,6 @@ function parseESPNStandings(json) {
     const grpLetter = lm ? lm[1].toUpperCase() : nm ? GROUP_NUM_TO_LETTER[parseInt(nm[1])] || null : null;
     const entries = groupNode.standings && groupNode.standings.entries || groupNode.entries || [];
     entries.forEach((entry, pos) => {
-      var _Object$entries$find;
       const teamName = normalizeTeam(entry.team && (entry.team.displayName || entry.team.shortDisplayName));
       if (!teamName) return;
       const stats = {};
@@ -1499,7 +1510,7 @@ function parseESPNStandings(json) {
       }
       results.push({
         team: teamName,
-        group: grpLetter || ((_Object$entries$find = Object.entries(GROUPS).find(([, ts]) => ts.includes(teamName))) === null || _Object$entries$find === void 0 ? void 0 : _Object$entries$find[0]) || null,
+        group: grpLetter || Object.entries(GROUPS).find(([, ts]) => ts.includes(teamName))?.[0] || null,
         mp: stats.gamesPlayed || stats.matchesPlayed || stats.played || 0,
         w: stats.wins || stats.w || 0,
         d: stats.ties || stats.draws || stats.d || 0,
@@ -1564,7 +1575,6 @@ function computeStandingsFromMatches(groupMatches) {
 // aggregates and presents in his Datawrapper chart.
 // Each price is a raw 0-1 decimal; no normalization applied.
 async function fetchPolymarketR32Odds() {
-  var _event$markets;
   // Primary: Polymarket's public Gamma API (CORS-enabled, no auth needed)
   const url = 'https://gamma-api.polymarket.com/events?slug=world-cup-team-to-advance-to-knockout-stages&limit=1';
   const resp = await fetch(url, {
@@ -1576,10 +1586,9 @@ async function fetchPolymarketR32Odds() {
   const data = await resp.json();
   const events = Array.isArray(data) ? data : data.data || [data];
   const event = events.find(e => e.markets && e.markets.length > 0) || events[0];
-  if (!(event !== null && event !== void 0 && (_event$markets = event.markets) !== null && _event$markets !== void 0 && _event$markets.length)) throw new Error('No markets in Gamma response');
+  if (!event?.markets?.length) throw new Error('No markets in Gamma response');
   const odds = {};
   (event.markets || []).forEach(m => {
-    var _ref, _m$lastTradePrice;
     // groupItemTitle holds the team name, e.g. "Ecuador"
     const teamRaw = m.groupItemTitle || m.title || m.question || '';
     // outcomePrices is a JSON string like '["0.99","0.01"]'
@@ -1592,7 +1601,7 @@ async function fetchPolymarketR32Odds() {
       yesPrice = parseFloat(prices[yesIdx >= 0 ? yesIdx : 0]);
     } catch {}
     // Fallback: some API versions expose bestBid/bestAsk directly
-    if (isNaN(yesPrice) || yesPrice === null) yesPrice = parseFloat((_ref = (_m$lastTradePrice = m.lastTradePrice) !== null && _m$lastTradePrice !== void 0 ? _m$lastTradePrice : m.midpoint) !== null && _ref !== void 0 ? _ref : '');
+    if (isNaN(yesPrice) || yesPrice === null) yesPrice = parseFloat(m.lastTradePrice ?? m.midpoint ?? '');
     const team = normalizeTeam(teamRaw.trim());
     if (team && !isNaN(yesPrice)) odds[team] = Math.max(0, Math.min(1, yesPrice));
   });
@@ -1643,7 +1652,6 @@ async function fetchNeilPaineOdds() {
 
 // Fetch WC winner probabilities from Polymarket.
 async function fetchPolymarketWCOdds() {
-  var _event$markets2;
   const url = 'https://gamma-api.polymarket.com/events?slug=world-cup-winner&limit=1';
   const resp = await fetch(url, {
     headers: {
@@ -1654,10 +1662,9 @@ async function fetchPolymarketWCOdds() {
   const data = await resp.json();
   const events = Array.isArray(data) ? data : data.data || [data];
   const event = events.find(e => e.markets && e.markets.length > 0) || events[0];
-  if (!(event !== null && event !== void 0 && (_event$markets2 = event.markets) !== null && _event$markets2 !== void 0 && _event$markets2.length)) throw new Error('No markets');
+  if (!event?.markets?.length) throw new Error('No markets');
   const odds = {};
   (event.markets || []).forEach(m => {
-    var _ref2, _m$lastTradePrice2;
     const teamRaw = m.groupItemTitle || m.title || m.question || '';
     let yesPrice = null;
     try {
@@ -1666,7 +1673,7 @@ async function fetchPolymarketWCOdds() {
       const yesIdx = outcomes.findIndex(o => /yes/i.test(String(o)));
       yesPrice = parseFloat(prices[yesIdx >= 0 ? yesIdx : 0]);
     } catch {}
-    if (isNaN(yesPrice) || yesPrice === null) yesPrice = parseFloat((_ref2 = (_m$lastTradePrice2 = m.lastTradePrice) !== null && _m$lastTradePrice2 !== void 0 ? _m$lastTradePrice2 : m.midpoint) !== null && _ref2 !== void 0 ? _ref2 : '');
+    if (isNaN(yesPrice) || yesPrice === null) yesPrice = parseFloat(m.lastTradePrice ?? m.midpoint ?? '');
     const team = normalizeTeam(teamRaw.trim());
     if (team && !isNaN(yesPrice)) odds[team] = Math.max(0, Math.min(1, yesPrice));
   });
@@ -1682,10 +1689,9 @@ async function fetchLiveOdds() {
   let r32Odds = null,
     wcOdds = null;
   try {
-    var _np$r32Odds, _np$wcOdds;
     const np = await fetchNeilPaineOdds();
-    r32Odds = (_np$r32Odds = np === null || np === void 0 ? void 0 : np.r32Odds) !== null && _np$r32Odds !== void 0 ? _np$r32Odds : null;
-    wcOdds = (_np$wcOdds = np === null || np === void 0 ? void 0 : np.wcOdds) !== null && _np$wcOdds !== void 0 ? _np$wcOdds : null;
+    r32Odds = np?.r32Odds ?? null;
+    wcOdds = np?.wcOdds ?? null;
   } catch {}
 
   // Fill any gaps with dedicated Polymarket API calls
@@ -2166,11 +2172,10 @@ const isEliminated = (team, stats, standings) => {
 //   5. SEED_ODDS — pre-tournament odds normalized per group (June 23 2026) → fallback
 // The returned value is always a clean 0–1 implied probability.
 const getAdvProb = (team, stats, standings, groupMatches, liveOdds) => {
-  var _SEED_ODDS$team;
   if (hasClinchedAdvancement(team, stats, standings, groupMatches)) return 1.0;
   if (isEliminated(team, stats, standings)) return 0.0;
   if (liveOdds && liveOdds[team] !== undefined) return liveOdds[team];
-  return (_SEED_ODDS$team = SEED_ODDS[team]) !== null && _SEED_ODDS$team !== void 0 ? _SEED_ODDS$team : 0.5;
+  return SEED_ODDS[team] ?? 0.5;
 };
 const getClinch = (team, stats, standings, groupMatches) => {
   // Priority 1: hardcoded KNOWN_STATUS (manually verified — always trusted over live feed)
@@ -2412,30 +2417,27 @@ function DraftRecapTab() {
       flexDirection: 'column',
       gap: 3
     }
-  }, playerPicks[p].map(team => {
-    var _Object$entries$find2;
-    return /*#__PURE__*/React.createElement("div", {
-      key: team,
-      style: {
-        fontSize: 11,
-        color: T.textPrimary,
-        padding: '3px 0',
-        borderBottom: `1px solid ${T.borderLight}`,
-        display: 'flex',
-        alignItems: 'center',
-        gap: 6
-      }
-    }, /*#__PURE__*/React.createElement(Flag, {
-      team: team,
-      size: 14
-    }), /*#__PURE__*/React.createElement("span", null, team), /*#__PURE__*/React.createElement("span", {
-      style: {
-        marginLeft: 'auto',
-        fontSize: 9,
-        color: T.textFaint
-      }
-    }, "G", (_Object$entries$find2 = Object.entries(GROUPS).find(([, ts]) => ts.includes(team))) === null || _Object$entries$find2 === void 0 ? void 0 : _Object$entries$find2[0]));
-  }))))));
+  }, playerPicks[p].map(team => /*#__PURE__*/React.createElement("div", {
+    key: team,
+    style: {
+      fontSize: 11,
+      color: T.textPrimary,
+      padding: '3px 0',
+      borderBottom: `1px solid ${T.borderLight}`,
+      display: 'flex',
+      alignItems: 'center',
+      gap: 6
+    }
+  }, /*#__PURE__*/React.createElement(Flag, {
+    team: team,
+    size: 14
+  }), /*#__PURE__*/React.createElement("span", null, team), /*#__PURE__*/React.createElement("span", {
+    style: {
+      marginLeft: 'auto',
+      fontSize: 9,
+      color: T.textFaint
+    }
+  }, "G", Object.entries(GROUPS).find(([, ts]) => ts.includes(team))?.[0]))))))));
 }
 
 // ═══════════════════ GROUP STAGE TAB ═══════════════════
@@ -2556,10 +2558,7 @@ function GroupStageTab({
     const pd = playerData.find(x => x.p === b).clinched - playerData.find(x => x.p === a).clinched;
     return pd !== 0 ? pd : totals(b).pts - totals(a).pts;
   });
-  const getRankLabel = rank => {
-    var _rank;
-    return (_rank = ['🥇', '🥈', '🥉', '4'][rank]) !== null && _rank !== void 0 ? _rank : `${rank + 1}`;
-  };
+  const getRankLabel = rank => ['🥇', '🥈', '🥉', '4'][rank] ?? `${rank + 1}`;
   const activeTeams = ALL_TEAMS;
   const liveNow = groupEvents.filter(e => e.state === 'in');
   const totalAlive = ALL_TEAMS.filter(t => getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED').length;
@@ -3033,17 +3032,16 @@ function GroupStageTab({
 // so the "actual" column reflects current on-field results, not the betting market
 // (which would give a trivial comparison when liveOdds === SEED_ODDS).
 const mathProb = (team, stats, standings, groupEvents) => {
-  var _SEED_ODDS$team2, _SEED_ODDS$team3, _pos, _pos2;
   if (hasClinchedAdvancement(team, stats, standings, groupEvents)) return 1.0;
   if (isEliminated(team, stats, standings)) return 0.0;
   const s = stats[team];
-  if (!s) return (_SEED_ODDS$team2 = SEED_ODDS[team]) !== null && _SEED_ODDS$team2 !== void 0 ? _SEED_ODDS$team2 : 0.5;
+  if (!s) return SEED_ODDS[team] ?? 0.5;
   const st = standings[s.group];
-  if (!st) return (_SEED_ODDS$team3 = SEED_ODDS[team]) !== null && _SEED_ODDS$team3 !== void 0 ? _SEED_ODDS$team3 : 0.5;
+  if (!st) return SEED_ODDS[team] ?? 0.5;
   const pos = st.indexOf(team);
   const rem = 3 - s.mp;
-  if (rem === 0) return (_pos = [1.0, 1.0, 0.55, 0.0][pos]) !== null && _pos !== void 0 ? _pos : 0.0;
-  const base = (_pos2 = [0.88, 0.68, 0.35, 0.10][pos]) !== null && _pos2 !== void 0 ? _pos2 : 0.10;
+  if (rem === 0) return [1.0, 1.0, 0.55, 0.0][pos] ?? 0.0;
+  const base = [0.88, 0.68, 0.35, 0.10][pos] ?? 0.10;
   return Math.min(0.97, Math.max(0.02, base + s.pts * 0.02));
 };
 function ChartsTab({
@@ -3164,10 +3162,7 @@ function ChartsTab({
         label: fmtD(date),
         pts: PLAYERS.reduce((a, p) => ({
           ...a,
-          [p]: playerTeams[p].reduce((s, t) => {
-            var _cStats$t;
-            return s + (((_cStats$t = cStats[t]) === null || _cStats$t === void 0 ? void 0 : _cStats$t.pts) || 0);
-          }, 0)
+          [p]: playerTeams[p].reduce((s, t) => s + (cStats[t]?.pts || 0), 0)
         }), {}),
         clinched: PLAYERS.reduce((a, p) => ({
           ...a,
@@ -3182,14 +3177,11 @@ function ChartsTab({
   // ── Performers data ───────────────────────────────────────────────
   const performersData = PLAYERS.map(p => ({
     player: p,
-    teams: playerTeams[p].map(team => {
-      var _SEED_ODDS$team4;
-      return {
-        team,
-        projected: (_SEED_ODDS$team4 = SEED_ODDS[team]) !== null && _SEED_ODDS$team4 !== void 0 ? _SEED_ODDS$team4 : 0.5,
-        actual: mathProb(team, stats, standings, groupEvents)
-      };
-    }).sort((a, b) => b.actual - b.projected - (a.actual - a.projected))
+    teams: playerTeams[p].map(team => ({
+      team,
+      projected: SEED_ODDS[team] ?? 0.5,
+      actual: mathProb(team, stats, standings, groupEvents)
+    })).sort((a, b) => b.actual - b.projected - (a.actual - a.projected))
   }));
 
   // ── Chart helpers ─────────────────────────────────────────────────
@@ -3528,13 +3520,12 @@ const BRACKET_W = 5 * COL_W;
 // advancement odds for knockout matches). Falls back to SEED_ODDS if WC odds not loaded.
 // Returns [p1pct, p2pct] or null if either team is TBD/unknown.
 function matchWinProb(t1, t2) {
-  var _wcOdds$t, _wcOdds$t2, _SEED_WC_ODDS$t, _SEED_WC_ODDS$t2;
   if (!t1 || !t2 || t1 === 'TBD' || t2 === 'TBD') return null;
   if (!ALL_TEAMS.includes(t1) || !ALL_TEAMS.includes(t2)) return null;
   // Use WC win probability if available — e.g. Brazil 15% vs Japan 2% → 88/12
   // This is far more accurate than R32 odds for head-to-head knockout matches
-  const w1 = (_wcOdds$t = _wcOdds[t1]) !== null && _wcOdds$t !== void 0 ? _wcOdds$t : null;
-  const w2 = (_wcOdds$t2 = _wcOdds[t2]) !== null && _wcOdds$t2 !== void 0 ? _wcOdds$t2 : null;
+  const w1 = _wcOdds[t1] ?? null;
+  const w2 = _wcOdds[t2] ?? null;
   if (w1 !== null && w2 !== null) {
     const total = w1 + w2;
     if (total === 0) return [50, 50];
@@ -3542,8 +3533,8 @@ function matchWinProb(t1, t2) {
     return [Math.max(1, Math.min(99, p1)), Math.max(1, Math.min(99, 100 - p1))];
   }
   // Fallback: SEED_WC_ODDS (approximate Polymarket WC win probs, team-specific)
-  const s1 = (_SEED_WC_ODDS$t = SEED_WC_ODDS[t1]) !== null && _SEED_WC_ODDS$t !== void 0 ? _SEED_WC_ODDS$t : 0.01,
-    s2 = (_SEED_WC_ODDS$t2 = SEED_WC_ODDS[t2]) !== null && _SEED_WC_ODDS$t2 !== void 0 ? _SEED_WC_ODDS$t2 : 0.01;
+  const s1 = SEED_WC_ODDS[t1] ?? 0.01,
+    s2 = SEED_WC_ODDS[t2] ?? 0.01;
   if (s1 + s2 === 0) return null;
   const p = Math.round(s1 / (s1 + s2) * 100);
   return [Math.max(1, Math.min(99, p)), Math.max(1, Math.min(99, 100 - p))];
@@ -3633,12 +3624,14 @@ function BracketCard({
         gap: 3,
         minHeight: 26,
         borderTop: idx === 1 ? `1px solid ${T.borderLight}` : 'none',
-        background: isWinner ? 'rgba(16,122,64,0.13)' : 'transparent',
-        opacity: isLoser ? 0.55 : 1
+        background: isWinner ? 'rgba(16,122,64,0.13)' : 'transparent'
       }
     }, team && /*#__PURE__*/React.createElement(Flag, {
       team: team,
-      size: 13
+      size: 13,
+      style: {
+        opacity: isLoser ? 0.45 : 1
+      }
     }), isWinner && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
@@ -3647,16 +3640,24 @@ function BracketCard({
     }, "🏆"), /*#__PURE__*/React.createElement("span", {
       style: {
         flex: 1,
-        fontWeight: isWinner ? 700 : own ? 600 : 400,
         fontSize: 10,
-        color: isLoser ? T.textFaint : isWinner && own ? PC[own].hex : own ? PC[own].hex : T.textSecondary,
         overflow: 'hidden',
         textOverflow: 'ellipsis',
-        whiteSpace: 'nowrap'
+        whiteSpace: 'nowrap',
+        fontWeight: isWinner ? 700 : own ? 600 : 400,
+        color: isLoser ? T.textFaint : isWinner ? own ? PC[own].hex : T.textPrimary : own ? PC[own].hex : T.textSecondary
       }
-    }, team || ''), team && !isLoser && /*#__PURE__*/React.createElement(OwnerBadge, {
-      owner: own
-    }), team && prob !== null && /*#__PURE__*/React.createElement("span", {
+    }, team || ''), team && own && /*#__PURE__*/React.createElement("span", {
+      style: {
+        fontSize: 7,
+        fontWeight: 700,
+        padding: '1px 3px',
+        borderRadius: 2,
+        background: isLoser ? T.borderLight : PC[own].subtle,
+        color: isLoser ? T.textFaint : PC[own].hex,
+        flexShrink: 0
+      }
+    }, own.slice(0, 2).toUpperCase()), team && prob !== null && /*#__PURE__*/React.createElement("span", {
       style: {
         fontSize: 9,
         color: T.textFaint,
@@ -3669,9 +3670,9 @@ function BracketCard({
       style: {
         fontSize: 11,
         fontWeight: 700,
-        color: isWinner ? T.textPrimary : T.textFaint,
         marginLeft: 2,
-        flexShrink: 0
+        flexShrink: 0,
+        color: isWinner ? T.textPrimary : T.textFaint
       }
     }, score));
   }), (city || date) && /*#__PURE__*/React.createElement("div", {
@@ -3781,7 +3782,7 @@ function KnockoutTab({
     const real = knockoutEvents.filter(e => e.round === round).sort((a, b) => new Date(a.date || 0) - new Date(b.date || 0));
     if (round === 'R32') {
       if (usingProjection) return projectedR32;
-      // Match real ESPN R32 matches to their correct bracket positions by team names
+      // Match real ESPN R32 matches to correct bracket positions by team name
       return projectedR32.map(seed => {
         if (!seed.t1 || !seed.t2 || seed.t1 === 'TBD' || seed.t2 === 'TBD') return seed;
         const match = real.find(m => m.t1 && m.t2 && (m.t1 === seed.t1 && m.t2 === seed.t2 || m.t1 === seed.t2 && m.t2 === seed.t1));
@@ -3789,26 +3790,18 @@ function KnockoutTab({
       });
     }
     const size = KO_SIZES[round];
-    // For rounds after R32, project from previous round winners if real data is sparse
-    const prevRound = {
-      R16: 'R32',
-      QF: 'R16',
-      SF: 'QF',
-      Final: 'SF'
-    }[round];
-    const prevSlots = prevRound ? getRoundSlots(prevRound) : null;
     const slots = [];
     for (let i = 0; i < size; i++) {
       const existing = real[i];
       if (existing && (existing.t1 !== 'TBD' || existing.t2 !== 'TBD')) {
         slots.push(existing);
-      } else if (prevSlots) {
-        // Project: pair consecutive previous-round winners
-        const a = prevSlots[i * 2],
-          b = prevSlots[i * 2 + 1];
-        const t1 = slotWinner(a) || 'TBD';
-        const t2 = slotWinner(b) || 'TBD';
-        slots.push(existing || {
+      } else if (round === 'R16') {
+        // R16 uses ESPN's non-sequential R32 pairs from R16_PAIRS
+        const r32 = getRoundSlots('R32');
+        const [ia, ib] = R16_PAIRS[i] || [i * 2, i * 2 + 1];
+        const t1 = slotWinner(r32[ia]) || 'TBD';
+        const t2 = slotWinner(r32[ib]) || 'TBD';
+        slots.push({
           t1,
           t2,
           s1: null,
@@ -3817,14 +3810,36 @@ function KnockoutTab({
           state: 'pre'
         });
       } else {
-        slots.push({
-          t1: 'TBD',
-          t2: 'TBD',
-          s1: null,
-          s2: null,
-          completed: false,
-          state: 'pre'
-        });
+        // QF/SF/Final: adjacent pairs of previous round
+        const prevRound = {
+          QF: 'R16',
+          SF: 'QF',
+          Final: 'SF'
+        }[round];
+        const prevSlots = prevRound ? getRoundSlots(prevRound) : null;
+        if (prevSlots) {
+          const a = prevSlots[i * 2],
+            b = prevSlots[i * 2 + 1];
+          const t1 = slotWinner(a) || 'TBD';
+          const t2 = slotWinner(b) || 'TBD';
+          slots.push(existing || {
+            t1,
+            t2,
+            s1: null,
+            s2: null,
+            completed: false,
+            state: 'pre'
+          });
+        } else {
+          slots.push({
+            t1: 'TBD',
+            t2: 'TBD',
+            s1: null,
+            s2: null,
+            completed: false,
+            state: 'pre'
+          });
+        }
       }
     }
     return slots;
@@ -3849,10 +3864,9 @@ function KnockoutTab({
   const wcProbRaw = PLAYERS.reduce((acc, p) => {
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     acc[p] = myTeams.reduce((sum, t) => {
-      var _wcOdds$t3, _SEED_WC_ODDS$t3;
       if (knockoutLosers.has(t)) return sum;
       if (getClinch(t, stats, standings, groupEvents) === 'ELIMINATED') return sum;
-      const prob = hasWCOdds ? (_wcOdds$t3 = _wcOdds[t]) !== null && _wcOdds$t3 !== void 0 ? _wcOdds$t3 : 0 : (_SEED_WC_ODDS$t3 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t3 !== void 0 ? _SEED_WC_ODDS$t3 : 0;
+      const prob = hasWCOdds ? _wcOdds[t] ?? 0 : SEED_WC_ODDS[t] ?? 0;
       return sum + prob;
     }, 0);
     return acc;
@@ -3877,10 +3891,7 @@ function KnockoutTab({
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     const activeTeamsForP = myTeams.filter(t => !knockoutLosers.has(t) && getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED');
     const numActive = activeTeamsForP.length;
-    const getProb = t => {
-      var _wcOdds$t4, _SEED_WC_ODDS$t4;
-      return hasWCOdds ? (_wcOdds$t4 = _wcOdds[t]) !== null && _wcOdds$t4 !== void 0 ? _wcOdds$t4 : 0 : (_SEED_WC_ODDS$t4 = SEED_WC_ODDS[t]) !== null && _SEED_WC_ODDS$t4 !== void 0 ? _SEED_WC_ODDS$t4 : 0;
-    };
+    const getProb = t => hasWCOdds ? _wcOdds[t] ?? 0 : SEED_WC_ODDS[t] ?? 0;
     const topTeam = numActive > 0 ? activeTeamsForP.reduce((best, t) => getProb(t) > getProb(best) ? t : best, activeTeamsForP[0]) : null;
     const underdogTeam = numActive > 1 ? activeTeamsForP.filter(t => getProb(t) > 0).reduce((worst, t) => getProb(t) < getProb(worst) ? t : worst, activeTeamsForP[0]) : null;
     const noTeams = numActive === 0;

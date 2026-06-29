@@ -489,30 +489,37 @@ const KO_ROUNDS = ['R32', 'R16', 'QF', 'SF', 'Final'];
 const KO_SIZES  = { R32: 16, R16: 8, QF: 4, SF: 2, Final: 1 };
 
 const R32_SEEDS = [
-  // Pair 0-1 → R16: Canada/SA winner vs Netherlands/Morocco winner
-  ['2B','2A'],  // Canada (B2) vs South Africa (A2)       June 28
-  ['1F','2C'],  // Netherlands (F1) vs Morocco (C2)        June 29
-  // Pair 2-3 → R16: Brazil/Japan winner vs Germany/Paraguay winner
-  ['1C','2F'],  // Brazil (C1) vs Japan (F2)               June 29
-  ['1E','3D'],  // Germany (E1) vs Paraguay (D3 wc)        June 29
-  // Pair 4-5 → R16: Ivory Coast/Norway winner vs France/Sweden winner
-  ['2E','1I'],  // Ivory Coast (E2) vs Norway (I1)         June 30
-  ['2I','3F'],  // France (I2) vs Sweden (F3 wc)           June 30
-  // Pair 6-7 → R16: Mexico/Ecuador winner vs Switzerland/Algeria winner
-  ['1A','3E'],  // Mexico (A1) vs Ecuador (E3 wc)          June 30
-  ['1B','3J'],  // Switzerland (B1) vs Algeria (J3 wc)     TBD
-  // Pair 8-9 → R16: Belgium/Senegal winner vs USA/Bosnia winner
-  ['1G','3I'],  // Belgium (G1) vs Senegal (I3 wc)         July 1
-  ['1D','3B'],  // USA (D1) vs Bosnia (B3 wc)              July 1
-  // Pair 10-11 → R16: England/DR Congo winner vs Portugal/Croatia winner
-  ['1L','3K'],  // England (L1) vs DR Congo (K3 wc)        July 1
-  ['2K','3L'],  // Portugal (K2) vs Croatia (L3 wc)        July 2
-  // Pair 12-13 → R16: Spain/Austria winner vs Argentina/Cape Verde winner
-  ['1H','2J'],  // Spain (H1) vs Austria (J2)              July 2
-  ['1J','2H'],  // Argentina (J1) vs Cape Verde (H2)       TBD
-  // Pair 14-15 → R16: Colombia/Ghana winner vs Australia/Egypt winner
-  ['1K','2L'],  // Colombia (K1) vs Ghana (L2)             TBD
-  ['2D','2G'],  // Australia (D2) vs Egypt (G2)            July 3
+  // ESPN bracket positions W1-W16 (left-to-right visual order)
+  // R16 pairings are non-sequential — see R16_PAIRS below
+  ['1E','3D'],  // W1:  Germany      vs Paraguay      June 29
+  ['2I','3F'],  // W2:  France        vs Sweden        June 30
+  ['2A','2B'],  // W3:  South Africa  vs Canada        June 28
+  ['1F','2C'],  // W4:  Netherlands   vs Morocco       June 29
+  ['2K','3L'],  // W5:  Portugal      vs Croatia       July 2
+  ['1H','2J'],  // W6:  Spain         vs Austria       July 2
+  ['1D','3B'],  // W7:  USA           vs Bosnia        July 1
+  ['1G','3I'],  // W8:  Belgium       vs Senegal       July 1
+  ['1C','2F'],  // W9:  Brazil        vs Japan         June 29
+  ['2E','1I'],  // W10: Ivory Coast   vs Norway        June 30
+  ['1A','3E'],  // W11: Mexico        vs Ecuador       June 30
+  ['1L','3K'],  // W12: England       vs DR Congo      July 1
+  ['1J','2H'],  // W13: Argentina     vs Cape Verde    July 3
+  ['2D','2G'],  // W14: Australia     vs Egypt         July 3
+  ['1B','3J'],  // W15: Switzerland   vs Algeria       July 3
+  ['1K','2L'],  // W16: Colombia      vs Ghana         July 4
+];
+
+// R16 pairings from ESPN bracket (indices into R32_SEEDS 0-based)
+// W1 vs W3, W2 vs W5, W4 vs W6, W7 vs W8, W9 vs W10, W11 vs W12, W13 vs W15, W14 vs W16
+const R16_PAIRS = [
+  [0, 2],   // R16-0: Germany/Paraguay vs SA/Canada          Jul 4
+  [1, 4],   // R16-1: France/Sweden vs Portugal/Croatia       Jul 4
+  [3, 5],   // R16-2: Netherlands/Morocco vs Spain/Austria    Jul 5
+  [6, 7],   // R16-3: USA/Bosnia vs Belgium/Senegal           Jul 5
+  [8, 9],   // R16-4: Brazil/Japan vs Ivory Coast/Norway      Jul 6
+  [10, 11], // R16-5: Mexico/Ecuador vs England/Congo DR      Jul 6
+  [12, 14], // R16-6: Argentina/Cape Verde vs Swiss/Algeria   Jul 7
+  [13, 15], // R16-7: Australia/Egypt vs Colombia/Ghana       Jul 7
 ];
 
 // ═══════════════════ TEAM NAME NORMALIZATION ═══════════════════
@@ -763,7 +770,7 @@ const ESPN_STANDINGS_URL = 'https://site.api.espn.com/apis/site/v2/sports/soccer
 
 const KO_DATE_RANGES = {
   R32:   ['2026-06-28', '2026-07-05'],
-  R16:   ['2026-07-07', '2026-07-10'],
+  R16:   ['2026-07-04', '2026-07-07'],
   QF:    ['2026-07-09', '2026-07-11'],
   SF:    ['2026-07-14', '2026-07-15'],
   Third: ['2026-07-18', '2026-07-18'],
@@ -2097,21 +2104,38 @@ function BracketCard({ t1, t2, s1, s2, completed, isLive, city, date }) {
           padding:'5px 7px', display:'flex', alignItems:'center', gap:3, minHeight:26,
           borderTop: idx===1 ? `1px solid ${T.borderLight}` : 'none',
           background: isWinner ? 'rgba(16,122,64,0.13)' : 'transparent',
-          opacity: isLoser ? 0.55 : 1,
         }}>
-          {team && <Flag team={team} size={13} />}
-          {isWinner && <span style={{fontSize:9,lineHeight:1}}>🏆</span>}
+          {/* Flag — colored always */}
+          {team && <Flag team={team} size={13} style={{ opacity: isLoser ? 0.45 : 1 }} />}
+          {/* Trophy — winner only */}
+          {isWinner && <span style={{ fontSize:9, lineHeight:1 }}>🏆</span>}
+          {/* Team name — grey if loser, owner-colored if winner, normal if pending */}
           <span style={{
-            flex:1, fontWeight: isWinner ? 700 : (own ? 600 : 400), fontSize:10,
-            color: isLoser ? T.textFaint : (isWinner && own ? PC[own].hex : (own ? PC[own].hex : T.textSecondary)),
-            overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            flex:1, fontSize:10, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap',
+            fontWeight: isWinner ? 700 : (own ? 600 : 400),
+            color: isLoser ? T.textFaint
+                 : isWinner ? (own ? PC[own].hex : T.textPrimary)
+                 : (own ? PC[own].hex : T.textSecondary),
           }}>{team || ''}</span>
-          {team && !isLoser && <OwnerBadge owner={own} />}
+          {/* Owner badge — grey if loser, colored if winner/pending */}
+          {team && own && (
+            <span style={{
+              fontSize:7, fontWeight:700, padding:'1px 3px', borderRadius:2,
+              background: isLoser ? T.borderLight : PC[own].subtle,
+              color: isLoser ? T.textFaint : PC[own].hex,
+              flexShrink:0,
+            }}>{own.slice(0,2).toUpperCase()}</span>
+          )}
+          {/* Pre-match odds — always grey */}
           {team && prob !== null && (
             <span style={{ fontSize:9, color:T.textFaint, fontVariantNumeric:'tabular-nums', flexShrink:0, minWidth:22, textAlign:'right' }}>{prob}%</span>
           )}
+          {/* Score — black for winner, grey for loser */}
           {showScore && score !== null && score !== undefined && (
-            <span style={{ fontSize:11, fontWeight:700, color: isWinner ? T.textPrimary : T.textFaint, marginLeft:2, flexShrink:0 }}>{score}</span>
+            <span style={{
+              fontSize:11, fontWeight:700, marginLeft:2, flexShrink:0,
+              color: isWinner ? T.textPrimary : T.textFaint,
+            }}>{score}</span>
           )}
         </div>
         );
@@ -2179,7 +2203,7 @@ function KnockoutTab({ knockoutEvents, stats, standings, groupEvents, liveOdds }
     const real = knockoutEvents.filter(e => e.round === round).sort((a,b)=>new Date(a.date||0)-new Date(b.date||0));
     if (round === 'R32') {
       if (usingProjection) return projectedR32;
-      // Match real ESPN R32 matches to their correct bracket positions by team names
+      // Match real ESPN R32 matches to correct bracket positions by team name
       return projectedR32.map(seed => {
         if (!seed.t1 || !seed.t2 || seed.t1==='TBD' || seed.t2==='TBD') return seed;
         const match = real.find(m =>
@@ -2190,22 +2214,30 @@ function KnockoutTab({ knockoutEvents, stats, standings, groupEvents, liveOdds }
       });
     }
     const size = KO_SIZES[round];
-    // For rounds after R32, project from previous round winners if real data is sparse
-    const prevRound = { R16:'R32', QF:'R16', SF:'QF', Final:'SF' }[round];
-    const prevSlots = prevRound ? getRoundSlots(prevRound) : null;
     const slots = [];
     for (let i = 0; i < size; i++) {
       const existing = real[i];
       if (existing && (existing.t1 !== 'TBD' || existing.t2 !== 'TBD')) {
         slots.push(existing);
-      } else if (prevSlots) {
-        // Project: pair consecutive previous-round winners
-        const a = prevSlots[i * 2], b = prevSlots[i * 2 + 1];
-        const t1 = slotWinner(a) || 'TBD';
-        const t2 = slotWinner(b) || 'TBD';
-        slots.push(existing || { t1, t2, s1:null, s2:null, completed:false, state:'pre' });
+      } else if (round === 'R16') {
+        // R16 uses ESPN's non-sequential R32 pairs from R16_PAIRS
+        const r32 = getRoundSlots('R32');
+        const [ia, ib] = R16_PAIRS[i] || [i*2, i*2+1];
+        const t1 = slotWinner(r32[ia]) || 'TBD';
+        const t2 = slotWinner(r32[ib]) || 'TBD';
+        slots.push({ t1, t2, s1:null, s2:null, completed:false, state:'pre' });
       } else {
-        slots.push({ t1:'TBD', t2:'TBD', s1:null, s2:null, completed:false, state:'pre' });
+        // QF/SF/Final: adjacent pairs of previous round
+        const prevRound = { QF:'R16', SF:'QF', Final:'SF' }[round];
+        const prevSlots = prevRound ? getRoundSlots(prevRound) : null;
+        if (prevSlots) {
+          const a = prevSlots[i*2], b = prevSlots[i*2+1];
+          const t1 = slotWinner(a) || 'TBD';
+          const t2 = slotWinner(b) || 'TBD';
+          slots.push(existing || { t1, t2, s1:null, s2:null, completed:false, state:'pre' });
+        } else {
+          slots.push({ t1:'TBD', t2:'TBD', s1:null, s2:null, completed:false, state:'pre' });
+        }
       }
     }
     return slots;

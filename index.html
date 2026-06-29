@@ -3668,7 +3668,7 @@ function BracketCard({
         color: isWinner ? T.textPrimary : T.textFaint
       }
     }, score));
-  }), !isTBD(t1) && !isTBD(t2) && /*#__PURE__*/React.createElement("div", {
+  }), /*#__PURE__*/React.createElement("div", {
     style: {
       padding: '1px 7px 3px',
       fontSize: 7,
@@ -3684,27 +3684,37 @@ function BracketLines() {
   const lines = [];
   KO_ROUNDS.slice(0, -1).forEach((round, r) => {
     const count = KO_SIZES[round];
-    for (let i = 0; i < count; i += 2) {
-      const top1 = bracketTop(r, i) + MATCH_CARD_H / 2;
-      const top2 = bracketTop(r, i + 1) + MATCH_CARD_H / 2;
-      const x1 = bracketLeft(r) + 150;
-      const xMid = x1 + 10;
-      const x2 = bracketLeft(r + 1);
-      const topNext = bracketTop(r + 1, Math.floor(i / 2)) + MATCH_CARD_H / 2;
-      lines.push(/*#__PURE__*/React.createElement("polyline", {
-        key: `${r}-${i}`,
-        points: `${x1},${top1} ${xMid},${top1} ${xMid},${topNext} ${x2},${topNext}`,
-        fill: "none",
-        stroke: T.border,
-        strokeWidth: "1"
-      }));
-      lines.push(/*#__PURE__*/React.createElement("polyline", {
-        key: `${r}-${i + 1}`,
-        points: `${x1},${top2} ${xMid},${top2} ${xMid},${topNext} ${x2},${topNext}`,
-        fill: "none",
-        stroke: T.border,
-        strokeWidth: "1"
-      }));
+    const xLeft = bracketLeft(r) + 150;
+    const xRight = bracketLeft(r + 1);
+    const xMid = xLeft + (xRight - xLeft) / 2;
+    if (round === 'R32') {
+      // R32→R16: non-adjacent per ESPN bracket, use R32_TO_R16_SLOT mapping
+      for (let i = 0; i < 16; i++) {
+        const yR32 = bracketTop(r, i) + MATCH_CARD_H / 2;
+        const yR16 = bracketTop(r + 1, R32_TO_R16_SLOT[i]) + MATCH_CARD_H / 2;
+        lines.push(/*#__PURE__*/React.createElement("polyline", {
+          key: `r32-${i}`,
+          points: `${xLeft},${yR32} ${xMid},${yR32} ${xMid},${yR16} ${xRight},${yR16}`,
+          fill: "none", stroke: T.border, strokeWidth: "1"
+        }));
+      }
+    } else {
+      // R16 onward: standard adjacent pairs
+      for (let i = 0; i < count; i += 2) {
+        const y1 = bracketTop(r, i) + MATCH_CARD_H / 2;
+        const y2 = bracketTop(r, i + 1) + MATCH_CARD_H / 2;
+        const yn = bracketTop(r + 1, Math.floor(i / 2)) + MATCH_CARD_H / 2;
+        lines.push(/*#__PURE__*/React.createElement("polyline", {
+          key: `${r}-${i}`,
+          points: `${xLeft},${y1} ${xMid},${y1} ${xMid},${yn} ${xRight},${yn}`,
+          fill: "none", stroke: T.border, strokeWidth: "1"
+        }));
+        lines.push(/*#__PURE__*/React.createElement("polyline", {
+          key: `${r}-${i + 1}`,
+          points: `${xLeft},${y2} ${xMid},${y2} ${xMid},${yn} ${xRight},${yn}`,
+          fill: "none", stroke: T.border, strokeWidth: "1"
+        }));
+      }
     }
   });
   return /*#__PURE__*/React.createElement("svg", {

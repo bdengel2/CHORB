@@ -3727,6 +3727,100 @@ function BracketLines() {
     }
   }, lines);
 }
+
+
+// Pre-verified schedule for future R16/QF/SF/Final matches.
+// Used as city+date fallback when ESPN hasn't populated event data yet.
+// All times UTC (ET + 4h). Sources: NBC Sports, CBS, FOX Sports.
+const ROUND_SCHED = {
+  R16: [
+    { city:'Philadelphia',  date:'2026-07-04T21:00:00Z' }, // M89 Paraguay vs France
+    { city:'Houston',       date:'2026-07-04T17:00:00Z' }, // M90 Canada vs Morocco
+    { city:'Dallas',        date:'2026-07-06T19:00:00Z' }, // M93 W84 vs W83
+    { city:'Seattle',       date:'2026-07-07T00:00:00Z' }, // M94 W81 vs W82
+    { city:'East Rutherford', date:'2026-07-05T20:00:00Z' }, // M91 Brazil vs Norway
+    { city:'Mexico City',   date:'2026-07-06T00:00:00Z' }, // M92 Mexico vs England
+    { city:'Atlanta',       date:'2026-07-07T16:00:00Z' }, // M95 W86 vs W88
+    { city:'Vancouver',     date:'2026-07-07T20:00:00Z' }, // M96 W85 vs W87
+  ],
+  QF: [
+    { city:'Boston',        date:'2026-07-09T20:00:00Z' }, // M97 W89 vs W90
+    { city:'Los Angeles',   date:'2026-07-10T19:00:00Z' }, // M98 W93 vs W94
+    { city:'Miami',         date:'2026-07-11T21:00:00Z' }, // M99 W91 vs W92
+    { city:'Kansas City',   date:'2026-07-12T01:00:00Z' }, // M100 W95 vs W96
+  ],
+  SF: [
+    { city:'Dallas',        date:'2026-07-14T19:00:00Z' }, // M101 W97 vs W98
+    { city:'Atlanta',       date:'2026-07-15T19:00:00Z' }, // M102 W99 vs W100
+  ],
+  Final: [
+    { city:'East Rutherford', date:'2026-07-19T19:00:00Z' }, // M104
+  ],
+};
+
+function SBView({sbR32Teams, sbR16Teams, sbQFTeams, sbSFTeams, sbFinalTeams, sbChampion}) {
+  const tfr = {};
+  sbR32Teams.forEach(t => { if(t) tfr[t] = 0; });
+  sbR16Teams.forEach(t => { if(t) tfr[t] = 1; });
+  sbQFTeams.forEach(t => { if(t) tfr[t] = 2; });
+  sbSFTeams.forEach(t => { if(t) tfr[t] = 3; });
+  sbFinalTeams.forEach(t => { if(t) tfr[t] = 4; });
+  if(sbChampion) tfr[sbChampion] = 5;
+
+  const color = t => {
+    if(!t) return '#d5d5d5';
+    const owner = PICKS[t] || PICKS[normalizeTeam(t)] || null;
+    return owner && PC[owner] ? PC[owner].hex : '#d5d5d5';
+  };
+
+  const COL_W = 90, G = 2;
+
+  const block = (team, h, round) => {
+    const advanced = team && (tfr[team] !== undefined ? tfr[team] : 0) > round;
+    const showName = team && tfr[team] === round;
+    const w = round === 0 && advanced ? COL_W + G : COL_W;
+    return /*#__PURE__*/React.createElement('div', {
+      style: {
+        height: h, width: w, background: color(team),
+        display: 'flex', alignItems: 'center', justifyContent: 'center',
+        fontSize: 9, fontWeight: 700, color: 'white',
+        whiteSpace: 'nowrap', overflow: 'hidden', flexShrink: 0,
+        letterSpacing: '0.01em'
+      }
+    },
+      round === 5
+        ? /*#__PURE__*/React.createElement('img', {src: './favicon.png', style: {width: 40, height: 40, opacity: 0.75}, alt: ''})
+        : (showName ? team : null)
+    );
+  };
+
+  const col = (teams, h, round, count) =>
+    /*#__PURE__*/React.createElement('div', {
+      style: {display:'flex', flexDirection:'column', gap: G, width: COL_W, flexShrink: 0, overflow:'visible'}
+    },
+      Array.from({length: count}, (_, i) => /*#__PURE__*/React.createElement('div', {key: i}, block(teams[i] || null, h, round)))
+    );
+
+  const ROUND_LABELS = ['Round of 32','Round of 16','Quarterfinals','Semifinals','Final','Winner'];
+  const hdrStyle = {width: COL_W, textAlign:'center', fontSize: 9, fontWeight: 700,
+    textTransform:'uppercase', letterSpacing: 1, color: T.accent,
+    padding: '3px 0', borderBottom: `1px solid ${T.border}`, flexShrink: 0};
+
+  return /*#__PURE__*/React.createElement('div', {style: {marginTop: 12, overflowX: 'auto'}},
+    /*#__PURE__*/React.createElement('div', {style: {display:'flex', gap: G, marginBottom: 6}},
+      ROUND_LABELS.map((r, i) => /*#__PURE__*/React.createElement('div', {key: i, style: hdrStyle}, r))
+    ),
+    /*#__PURE__*/React.createElement('div', {style: {display:'flex', gap: G}},
+      col(sbR32Teams, 24, 0, 32),
+      col(sbR16Teams, 50, 1, 16),
+      col(sbQFTeams, 102, 2, 8),
+      col(sbSFTeams, 206, 3, 4),
+      col(sbFinalTeams, 414, 4, 2),
+      col([sbChampion], 830, 5, 1)
+    )
+  );
+}
+
 function KnockoutTab({
   knockoutEvents,
   stats,
@@ -3744,18 +3838,18 @@ function KnockoutTab({
     { t1:'France',       t2:'Sweden',                 city:'East Rutherford', date:'2026-06-30T22:00:00Z' }, // → R16-0
     { t1:'South Africa', t2:'Canada',                 city:'Los Angeles',     date:'2026-06-28T20:00:00Z' }, // → R16-1 w/ row4
     { t1:'Netherlands',  t2:'Morocco',                city:'Monterrey',       date:'2026-06-30T02:00:00Z' }, // → R16-1
-    { t1:'Portugal',     t2:'Croatia',                city:'Toronto',         date:'2026-07-03T00:00:00Z' }, // → R16-2 w/ row6
-    { t1:'Spain',        t2:'Austria',                city:'Los Angeles',     date:'2026-07-02T20:00:00Z' }, // → R16-2
-    { t1:'USA',          t2:'Bosnia and Herzegovina', city:'San Francisco',   date:'2026-07-02T01:00:00Z' }, // → R16-3 w/ row8
-    { t1:'Belgium',      t2:'Senegal',                city:'Seattle',         date:'2026-07-01T21:00:00Z' }, // → R16-3
+    { t1:'Portugal',     t2:'Croatia',                city:'Toronto',         date:'2026-07-02T23:00:00Z' }, // → R16-2 w/ row6
+    { t1:'Spain',        t2:'Austria',                city:'Los Angeles',     date:'2026-07-02T19:00:00Z' }, // → R16-2
+    { t1:'USA',          t2:'Bosnia and Herzegovina', city:'San Francisco',   date:'2026-07-02T00:00:00Z' }, // → R16-3 w/ row8
+    { t1:'Belgium',      t2:'Senegal',                city:'Seattle',         date:'2026-07-01T20:00:00Z' }, // → R16-3
     { t1:'Brazil',       t2:'Japan',                  city:'Houston',         date:'2026-06-29T17:00:00Z' }, // → R16-4 w/ row10
     { t1:'Ivory Coast',  t2:'Norway',                 city:'Dallas',          date:'2026-06-30T18:00:00Z' }, // → R16-4
     { t1:'Mexico',       t2:'Ecuador',                city:'Mexico City',     date:'2026-07-01T02:00:00Z' }, // → R16-5 w/ row12
     { t1:'England',      t2:'DR Congo',               city:'Atlanta',         date:'2026-07-01T17:00:00Z' }, // → R16-5
-    { t1:'Argentina',    t2:'Cape Verde',             city:'Miami',           date:'2026-07-04T00:00:00Z' }, // → R16-6 w/ row14
-    { t1:'Australia',    t2:'Egypt',                  city:'Dallas',          date:'2026-07-03T19:00:00Z' }, // → R16-6
-    { t1:'Switzerland',  t2:'Algeria',                city:'Dallas',          date:'2026-07-04T00:00:00Z' }, // → R16-7 w/ row16
-    { t1:'Colombia',     t2:'Ghana',                  city:'Kansas City',     date:'2026-07-04T23:00:00Z' }, // → R16-7
+    { t1:'Argentina',    t2:'Cape Verde',             city:'Miami',           date:'2026-07-03T22:00:00Z' }, // → R16-6 w/ row14
+    { t1:'Australia',    t2:'Egypt',                  city:'Dallas',          date:'2026-07-03T18:00:00Z' }, // → R16-6
+    { t1:'Switzerland',  t2:'Algeria',                city:'Vancouver',       date:'2026-07-03T03:00:00Z' }, // → R16-7 w/ row16
+    { t1:'Colombia',     t2:'Ghana',                  city:'Kansas City',     date:'2026-07-04T01:30:00Z' }, // → R16-7
   ];
   // R16 pairings: ESPN W1vsW3,W2vsW5,W4vsW6,W7vsW8,W9vsW10,W11vsW12,W13vsW15,W14vsW16
   // R16 pairs: confirmed adjacent — (0,1)=Match89/90 source, etc.
@@ -3840,12 +3934,13 @@ function KnockoutTab({
         s2: null,
         completed: false,
         state: 'pre',
-        city: espnForCity ? espnForCity.city : null,
-        date: espnForCity ? espnForCity.date : null
+        city: (espnForCity ? espnForCity.city : null) || (ROUND_SCHED[round] && ROUND_SCHED[round][i] ? ROUND_SCHED[round][i].city : null),
+        date: (espnForCity ? espnForCity.date : null) || (ROUND_SCHED[round] && ROUND_SCHED[round][i] ? ROUND_SCHED[round][i].date : null)
       };
     });
   };
   const thirdPlaceMatch = knockoutEvents.find(e => e.round === 'Third');
+  const [bracketView, setBracketView] = React.useState('detailed');
   const knockoutLosers = new Set();
   knockoutEvents.forEach(e => {
     if (e.completed && e.s1 !== null && e.s2 !== null) {
@@ -3858,6 +3953,20 @@ function KnockoutTab({
       }
     }
   });
+  // Simplified bracket data
+  const _toTeam = t => (!t || t === 'TBD' || !ALL_TEAMS.includes(normalizeTeam(t))) ? null : t;
+  const sbR32Teams = R32_HARDCODED.flatMap(m => [m.t1, m.t2]);
+  const _r32MS = getRoundSlots('R32');
+  const _r16MS = getRoundSlots('R16');
+  const _qfMS = getRoundSlots('QF');
+  const _sfMS = getRoundSlots('SF');
+  const _finMS = getRoundSlots('Final');
+  const sbR16Teams = _r16MS.flatMap(s => [_toTeam(s.t1), _toTeam(s.t2)]);
+  const sbQFTeams = _qfMS.flatMap(s => [_toTeam(s.t1), _toTeam(s.t2)]);
+  const sbSFTeams = _sfMS.flatMap(s => [_toTeam(s.t1), _toTeam(s.t2)]);
+  const sbFinalTeams = _finMS.length ? [_toTeam(_finMS[0].t1), _toTeam(_finMS[0].t2)] : [null, null];
+  const sbChampion = _finMS.length ? slotWinner(_finMS[0]) : null;
+
   const remaining = PLAYERS.reduce((acc, p) => {
     const myTeams = Object.entries(PICKS).filter(([, o]) => o === p).map(([t]) => t);
     acc[p] = myTeams.filter(t => getClinch(t, stats, standings, groupEvents) !== 'ELIMINATED' && !knockoutLosers.has(t)).length;
@@ -4064,67 +4173,92 @@ function KnockoutTab({
       fontSize: 9,
       color: T.textFaint
     }
-  }, "WC win % normalized across all owners based on Polymarket Win WC odds for active teams. Most likely champion = owner's team with highest WC win probability."), /*#__PURE__*/React.createElement("div", {
-    style: {
-      background: T.card,
-      border: `1px solid ${T.border}`,
-      borderRadius: 4,
-      padding: 16,
-      overflowX: 'auto'
-    }
-  }, /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'relative',
-      width: BRACKET_W,
-      height: BRACKET_H + 40,
-      minWidth: BRACKET_W
-    }
-  }, KO_ROUNDS.map((round, r) => /*#__PURE__*/React.createElement("div", {
-    key: round,
-    style: {
-      position: 'absolute',
-      top: 0,
-      left: bracketLeft(r),
-      width: 150,
-      textAlign: 'center',
-      fontSize: 9,
-      color: T.accent,
-      fontWeight: 700,
-      textTransform: 'uppercase',
-      letterSpacing: 1,
-      padding: '3px 0',
-      borderBottom: `1px solid ${T.border}`
-    }
-  }, round === 'R32' ? 'Round of 32' : round === 'R16' ? 'Round of 16' : round === 'QF' ? 'Quarterfinals' : round === 'SF' ? 'Semifinals' : 'Final')), /*#__PURE__*/React.createElement("div", {
-    style: {
-      position: 'absolute',
-      top: 22,
-      left: 0,
-      width: BRACKET_W,
-      height: BRACKET_H
-    }
-  }, /*#__PURE__*/React.createElement(BracketLines, null), KO_ROUNDS.map((round, r) => {
-    const slots = getRoundSlots(round);
-    return slots.map((m, i) => /*#__PURE__*/React.createElement("div", {
-      key: `${round}-${i}`,
-      style: {
-        position: 'absolute',
-        top: bracketTop(r, i),
-        left: bracketLeft(r)
-      }
-    }, /*#__PURE__*/React.createElement(BracketCard, {
-      t1: m.t1,
-      t2: m.t2,
-      s1: m.s1,
-      s2: m.s2,
-      p1: m.p1,
-      p2: m.p2,
-      completed: m.completed,
-      isLive: m.state === 'in',
-      city: m.city,
-      date: m.date
-    })));
-  })))), thirdPlaceMatch && /*#__PURE__*/React.createElement("div", {
+  }, "WC win % normalized across all owners based on Polymarket Win WC odds for active teams. Most likely champion = owner's team with highest WC win probability."), /*#__PURE__*/React.createElement("div", null,
+    /*#__PURE__*/React.createElement("div", {
+      style: {display:'flex', gap: 6, marginBottom: 10}
+    },
+      ['detailed','simplified'].map(v => /*#__PURE__*/React.createElement("button", {
+        key: v,
+        onClick: () => setBracketView(v),
+        style: {
+          padding: '5px 14px',
+          fontSize: 11,
+          fontWeight: 600,
+          borderRadius: 3,
+          border: `1px solid ${bracketView === v ? T.accent : T.border}`,
+          background: bracketView === v ? T.accent : T.card,
+          color: bracketView === v ? '#fff' : T.textSecondary,
+          cursor: 'pointer',
+          letterSpacing: '0.02em'
+        }
+      }, v === 'detailed' ? 'Detailed Bracket' : 'Simplified Bracket'))
+    ),
+    bracketView === 'detailed'
+      ? /*#__PURE__*/React.createElement("div", {
+          style: {
+            background: T.card,
+            border: `1px solid ${T.border}`,
+            borderRadius: 4,
+            padding: 16,
+            overflowX: 'auto'
+          }
+        }, /*#__PURE__*/React.createElement("div", {
+          style: {
+            position: 'relative',
+            width: BRACKET_W,
+            height: BRACKET_H + 40,
+            minWidth: BRACKET_W
+          }
+        }, KO_ROUNDS.map((round, r) => /*#__PURE__*/React.createElement("div", {
+          key: round,
+          style: {
+            position: 'absolute',
+            top: 0,
+            left: bracketLeft(r),
+            width: 150,
+            textAlign: 'center',
+            fontSize: 9,
+            color: T.accent,
+            fontWeight: 700,
+            textTransform: 'uppercase',
+            letterSpacing: 1,
+            padding: '3px 0',
+            borderBottom: `1px solid ${T.border}`
+          }
+        }, round === 'R32' ? 'Round of 32' : round === 'R16' ? 'Round of 16' : round === 'QF' ? 'Quarterfinals' : round === 'SF' ? 'Semifinals' : 'Final')), /*#__PURE__*/React.createElement("div", {
+          style: {
+            position: 'absolute',
+            top: 22,
+            left: 0,
+            width: BRACKET_W,
+            height: BRACKET_H
+          }
+        }, /*#__PURE__*/React.createElement(BracketLines, null), KO_ROUNDS.map((round, r) => {
+          const slots = getRoundSlots(round);
+          return slots.map((m, i) => /*#__PURE__*/React.createElement("div", {
+            key: `${round}-${i}`,
+            style: {
+              position: 'absolute',
+              top: bracketTop(r, i),
+              left: bracketLeft(r)
+            }
+          }, /*#__PURE__*/React.createElement(BracketCard, {
+            t1: m.t1,
+            t2: m.t2,
+            s1: m.s1,
+            s2: m.s2,
+            p1: m.p1,
+            p2: m.p2,
+            completed: m.completed,
+            isLive: m.state === 'in',
+            city: m.city,
+            date: m.date
+          })));
+        }))))
+      : /*#__PURE__*/React.createElement(SBView, {
+          sbR32Teams, sbR16Teams, sbQFTeams, sbSFTeams, sbFinalTeams, sbChampion
+        })
+  ), thirdPlaceMatch && /*#__PURE__*/React.createElement("div", {
     style: {
       display: 'flex',
       alignItems: 'center',
